@@ -1,0 +1,31 @@
+# ─── Virtual Environments ──────────────────────────────────────────────
+.env/
+.venv/
+venv/
+
+# ─── IDE & Editor Files ────────────────────────────────────────────────
+# JetBrains IDEs
+.idea/
+*.iml
+workspace.xml
+
+# VSCode
+.vscode/
+
+# ─── Jupyter Notebooks ─────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ─── PyTorch Lightning Artifacts ──────────────────────────────────────
+lightning_logs/      # default logs folder
+checkpoints/         # model checkpoints
+
+# ─── Synthetic Data & Caches ──────────────────────────────────────────
+synthetic_profiles/  # generated .npz profiles
+httpRequests/        # HTTP Client requests
+dataSources/         # data source configs
+dataSources.local.xml
+
+# ─── Miscellaneous ────────────────────────────────────────────────────
+# Add here any other temp files, log files, etc.
+*.log
+*.npz
