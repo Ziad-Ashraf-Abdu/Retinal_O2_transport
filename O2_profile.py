@@ -1,3 +1,5 @@
+import os
+import pickle
 import warnings
 import numpy as np
 import torch
@@ -13,29 +15,50 @@ torch.set_float32_matmul_precision('high')
 
 # === CONFIGURATION ===
 CONFIG = {
-    'max_runs': 5,
-    'error_threshold': 0.08,  # More ambitious target
+    'max_runs': 3,
+    'error_threshold': 0.04,  # More ambitious target
     'pretrain_epochs': 250,
     'finetune_epochs': 350,
     'lr_pretrain': 2e-3,
     'lr_finetune': 3e-4,
-    'batch_size': 48,
-    'samples_per_profile': 400,
-    'lambda_pde': 0.01,  # Fine-tuned physics weight
-    'grad_clip_val': 0.8
+    'batch_size': 64,
+    'samples_per_profile': 1000,
+    'lambda_pde': 0.015,  # Fine-tuned physics weight
+    'grad_clip_val': 0.8,
+    'model_save_dir': 'model_checkpoints'
 }
 
 # Problem setup with higher resolution
 z_np = np.linspace(0, 1, 800, dtype=np.float32)  # Optimal resolution
 dz = z_np[1] - z_np[0]
 z_torch = torch.tensor(z_np, dtype=torch.float32)
-z_interface = 0.5
-idx_interface = int(len(z_np) * z_interface)
 
-param_names = ["D2", "k2", "D3", "k3", "C0", "CL"]
+# Four-layer interfaces
+z_interface1 = 0.25
+z_interface2 = 0.50
+z_interface3 = 0.75
+idx_interface1 = int(len(z_np) * z_interface1)
+idx_interface2 = int(len(z_np) * z_interface2)
+idx_interface3 = int(len(z_np) * z_interface3)
+
+# Updated parameter names and ranges for 4 layers
+param_names = ["DIR", "kIR", "DOR", "kOR", "DFL", "kFL", "DCC", "kCC", "C0", "CL"]
 param_ranges = {
-    "D2": (0.8e4, 1.2e4), "k2": (0.05, 0.15), "D3": (0.8e4, 1.2e4),
-    "k3": (0.05, 0.15), "C0": (10, 30), "CL": (50, 70)
+    # Diffusion coefficients (cm²/s)
+    "DIR": (1.8e-5, 2.1e-5),
+    "DOR": (1.4e-5, 1.9e-5),
+    "DFL": (2.3e-5, 2.7e-5),
+    "DCC": (2.0e-5, 2.4e-5),
+
+    # Solubility (ml O₂ / ml tissue / mmHg)
+    "kIR": (2.0e-5, 3.0e-5),
+    "kOR": (2.0e-5, 3.0e-5),
+    "kFL": (2.5e-5, 3.5e-5),
+    "kCC": (2.5e-5, 3.5e-5),
+
+    # Boundary partial pressures (mmHg)
+    "C0": (15.0, 25.0),
+    "CL": (100.0, 125.0),
 }
 
 
@@ -70,100 +93,130 @@ def denormalize_params(normalized_params):
 
 
 # ===  FORWARD MODEL ===
-def forward_piecewise_precise(z, D2, k2, D3, k3, C0, CL):
-    """Ultra-precise analytical forward model"""
+def forward_piecewise_precise(z, DIR, kIR, DOR, kOR, DFL, kFL, DCC, kCC, C0, CL):
+    """Four-layer analytical forward model"""
     eps = 1e-12
-    D2, D3 = max(D2, eps), max(D3, eps)
-    k2, k3 = max(k2, eps), max(k3, eps)
+    DIR, DOR, DFL, DCC = max(DIR, eps), max(DOR, eps), max(DFL, eps), max(DCC, eps)
+    kIR, kOR, kFL, kCC = max(kIR, eps), max(kOR, eps), max(kFL, eps), max(kCC, eps)
 
     try:
-        # High-precision analytical solution
-        alpha2 = np.sqrt(k2 / D2)
-        alpha3 = np.sqrt(k3 / D3)
-        zi = z_interface
-
-        # Pre-compute exponentials for stability
-        exp_a2_zi = np.exp(alpha2 * zi)
-        exp_neg_a2_zi = np.exp(-alpha2 * zi)
-        exp_a3_1_zi = np.exp(alpha3 * (1 - zi))
-        exp_neg_a3_1_zi = np.exp(-alpha3 * (1 - zi))
-
-        # Solve boundary value problem analytically
-        denom = (exp_a2_zi + exp_neg_a2_zi) * alpha3 * D3 + (exp_a3_1_zi + exp_neg_a3_1_zi) * alpha2 * D2
-
-        if abs(denom) < eps:
-            return C0 + (CL - C0) * z
-
-        A = (CL - C0) * alpha3 * D3 / denom
-        B = (CL - C0) * alpha2 * D2 / denom
-
         result = np.zeros_like(z)
-        left_mask = z <= zi
-        right_mask = z > zi
 
-        if np.any(left_mask):
-            z_left = z[left_mask]
-            C_int = A * (exp_a2_zi + exp_neg_a2_zi)
-            result[left_mask] = A * (np.exp(alpha2 * z_left) + np.exp(-alpha2 * z_left)) + \
-                                (C0 - C_int) * z_left / zi
+        # Define regions
+        region1_mask = z <= z_interface1
+        region2_mask = (z > z_interface1) & (z <= z_interface2)
+        region3_mask = (z > z_interface2) & (z <= z_interface3)
+        region4_mask = z > z_interface3
 
-        if np.any(right_mask):
-            z_right = z[right_mask]
-            C_int = B * (exp_a3_1_zi + exp_neg_a3_1_zi)
-            result[right_mask] = B * (np.exp(alpha3 * (1 - z_right)) + np.exp(-alpha3 * (1 - z_right))) + \
-                                 (CL - C_int) * (1 - z_right) / (1 - zi)
+        # Linear base interpolation
+        linear_base = C0 + (CL - C0) * z
+
+        result[i] = linear_base.clone()
+
+        # Region 1: Inner Retina
+        if np.any(region1_mask):
+            z_reg = z[region1_mask]
+            alpha = np.sqrt(kIR / DIR)
+            correction = 0.1 * np.exp(-alpha * z_reg) * np.sin(np.pi * z_reg / z_interface1)
+            result[region1_mask] = linear_base[region1_mask] + correction
+
+        # Region 2: Outer Retina
+        if np.any(region2_mask):
+            z_reg = z[region2_mask]
+            alpha = np.sqrt(kOR / DOR)
+            correction = 0.1 * np.exp(-alpha * (z_reg - z_interface1)) * np.sin(
+                np.pi * (z_reg - z_interface1) / (z_interface2 - z_interface1))
+            result[region2_mask] = linear_base[region2_mask] + correction
+
+        # Region 3: Fluid Layer
+        if np.any(region3_mask):
+            z_reg = z[region3_mask]
+            alpha = np.sqrt(kFL / DFL)
+            correction = 0.1 * np.exp(-alpha * (z_reg - z_interface2)) * np.sin(
+                np.pi * (z_reg - z_interface2) / (z_interface3 - z_interface2))
+            result[region3_mask] = linear_base[region3_mask] + correction
+
+        # Region 4: Choriocapillaris
+        if np.any(region4_mask):
+            z_reg = z[region4_mask]
+            alpha = np.sqrt(kCC / DCC)
+            correction = 0.1 * np.exp(-alpha * (1 - z_reg)) * np.sin(
+                np.pi * (z_reg - z_interface3) / (1 - z_interface3))
+            result[region4_mask] = linear_base[region4_mask] + correction
 
         return result
     except:
         return C0 + (CL - C0) * z
 
 
-def forward_piecewise_torch(z, D2, k2, D3, k3, C0, CL):
-    """Differentiable torch forward model - optimized"""
+def forward_piecewise_torch(z, DIR, kIR, DOR, kOR, DFL, kFL, DCC, kCC, C0, CL):
+    """Four-layer differentiable torch forward model with linear base seeding."""
+    global linear_base
     eps = 1e-10
-    batch_size = D2.shape[0]
-    device = D2.device
+    batch_size = DIR.shape[0]
+    device = DIR.device
 
     if z.dim() == 1:
         z = z.unsqueeze(0).expand(batch_size, -1)
 
-    # Stabilized parameters
-    D2 = torch.clamp(D2.squeeze(), min=eps)
-    D3 = torch.clamp(D3.squeeze(), min=eps)
-    k2 = torch.clamp(k2.squeeze(), min=eps)
-    k3 = torch.clamp(k3.squeeze(), min=eps)
+    # Stabilize parameters
+    DIR = torch.clamp(DIR.squeeze(), min=eps)
+    DOR = torch.clamp(DOR.squeeze(), min=eps)
+    DFL = torch.clamp(DFL.squeeze(), min=eps)
+    DCC = torch.clamp(DCC.squeeze(), min=eps)
+    kIR = torch.clamp(kIR.squeeze(), min=eps)
+    kOR = torch.clamp(kOR.squeeze(), min=eps)
+    kFL = torch.clamp(kFL.squeeze(), min=eps)
+    kCC = torch.clamp(kCC.squeeze(), min=eps)
     C0, CL = C0.squeeze(), CL.squeeze()
 
     result = torch.zeros((batch_size, z.shape[1]), device=device, dtype=z.dtype)
-    zi = z_interface
 
     for i in range(batch_size):
         try:
-            # Simplified but accurate physics-informed approximation
+            # 1) Compute the linear baseline everywhere
             linear_base = C0[i] + (CL[i] - C0[i]) * z[i]
+            result[i] = linear_base.clone()
 
-            # Add reaction-diffusion corrections
-            alpha2 = torch.sqrt(k2[i] / D2[i])
-            alpha3 = torch.sqrt(k3[i] / D3[i])
+            # 2) Masks for the four regions
+            r1 = z[i] <= z_interface1
+            r2 = (z[i] > z_interface1) & (z[i] <= z_interface2)
+            r3 = (z[i] > z_interface2) & (z[i] <= z_interface3)
+            r4 = z[i] > z_interface3
 
-            left_mask = z[i] <= zi
-            right_mask = z[i] > zi
+            # 3) Add the small reaction–diffusion corrections on top
+            if torch.any(r1):
+                z_reg = z[i][r1]
+                α = torch.sqrt(kIR[i] / DIR[i])
+                corr = 0.1 * torch.exp(-α * z_reg) * torch.sin(np.pi * z_reg / z_interface1)
+                result[i][r1] += corr
 
-            if torch.any(left_mask):
-                z_left = z[i][left_mask]
-                correction = 0.1 * torch.exp(-alpha2 * z_left) * torch.sin(np.pi * z_left / zi)
-                result[i][left_mask] = linear_base[left_mask] + correction
+            if torch.any(r2):
+                z_reg = z[i][r2]
+                α = torch.sqrt(kOR[i] / DOR[i])
+                corr = 0.1 * torch.exp(-α * (z_reg - z_interface1)) * torch.sin(
+                    np.pi * (z_reg - z_interface1) / (z_interface2 - z_interface1))
+                result[i][r2] += corr
 
-            if torch.any(right_mask):
-                z_right = z[i][right_mask]
-                correction = 0.1 * torch.exp(-alpha3 * (1 - z_right)) * torch.sin(np.pi * (z_right - zi) / (1 - zi))
-                result[i][right_mask] = linear_base[right_mask] + correction
+            if torch.any(r3):
+                z_reg = z[i][r3]
+                α = torch.sqrt(kFL[i] / DFL[i])
+                corr = 0.1 * torch.exp(-α * (z_reg - z_interface2)) * torch.sin(
+                    np.pi * (z_reg - z_interface2) / (z_interface3 - z_interface2))
+                result[i][r3] += corr
+
+            if torch.any(r4):
+                z_reg = z[i][r4]
+                α = torch.sqrt(kCC[i] / DCC[i])
+                corr = 0.1 * torch.exp(-α * (1 - z_reg)) * torch.sin(
+                    np.pi * (z_reg - z_interface3) / (1 - z_interface3))
+                result[i][r4] += corr
 
         except:
-            result[i] = C0[i] + (CL[i] - C0[i]) * z[i]
+            # Fallback to pure linear if something goes wrong
+            result[i] = linear_base
 
     return result
-
 
 # ===  DATASET ===
 class configDataset(Dataset):
@@ -172,25 +225,29 @@ class configDataset(Dataset):
         self.z = z_np
         self.data = []
 
-        print(f"🎯 Generating {samples_per_profile * len(configs)}  samples...")
+        print(f"🎯 Generating {samples_per_profile * len(configs)} samples...")
 
         profiles, params_list = [], []
 
         for name, rng in configs.items():
             for _ in range(samples_per_profile):
-                # Smart parameter sampling with better coverage
+                # Smart parameter sampling for 10 parameters
                 params = np.array([
-                    np.random.beta(2, 2) * (rng["D2"][1] - rng["D2"][0]) + rng["D2"][0],
-                    np.random.beta(2, 2) * (rng["k2"][1] - rng["k2"][0]) + rng["k2"][0],
-                    np.random.beta(2, 2) * (rng["D3"][1] - rng["D3"][0]) + rng["D3"][0],
-                    np.random.beta(2, 2) * (rng["k3"][1] - rng["k3"][0]) + rng["k3"][0],
+                    np.random.beta(2, 2) * (rng["DIR"][1] - rng["DIR"][0]) + rng["DIR"][0],
+                    np.random.beta(2, 2) * (rng["kIR"][1] - rng["kIR"][0]) + rng["kIR"][0],
+                    np.random.beta(2, 2) * (rng["DOR"][1] - rng["DOR"][0]) + rng["DOR"][0],
+                    np.random.beta(2, 2) * (rng["kOR"][1] - rng["kOR"][0]) + rng["kOR"][0],
+                    np.random.beta(2, 2) * (rng["DFL"][1] - rng["DFL"][0]) + rng["DFL"][0],
+                    np.random.beta(2, 2) * (rng["kFL"][1] - rng["kFL"][0]) + rng["kFL"][0],
+                    np.random.beta(2, 2) * (rng["DCC"][1] - rng["DCC"][0]) + rng["DCC"][0],
+                    np.random.beta(2, 2) * (rng["kCC"][1] - rng["kCC"][0]) + rng["kCC"][0],
                     np.random.uniform(*rng["C0"]),
                     np.random.uniform(*rng["CL"])
                 ], dtype=np.float32)
 
                 # Ensure physical consistency
-                if params[4] >= params[5]:
-                    params[4], params[5] = params[5] - 3, params[4] + 3
+                if params[8] >= params[9]:  # C0 >= CL
+                    params[8], params[9] = params[9] - 3, params[8] + 3
 
                 # Generate ultra-clean profile
                 C_clean = forward_piecewise_precise(self.z, *params).astype(np.float32)
@@ -198,12 +255,15 @@ class configDataset(Dataset):
                 # Add minimal, realistic noise
                 noise_level = 0.005 * np.std(C_clean)
                 noise = np.random.normal(0, noise_level, C_clean.shape).astype(np.float32)
+                if np.random.rand() < 0.1:
+                    noise *= np.random.uniform(2.0, 5.0)  # 2–5× higher noise
+
                 C_noisy = np.maximum(C_clean + noise, 0.01)
 
                 profiles.append(C_noisy)
                 params_list.append(params)
 
-        #  normalization strategy
+        # Normalization strategy
         profiles = np.array(profiles)
         self.profile_mean = np.mean(profiles, axis=0)
         self.profile_std = np.std(profiles, axis=0) + 1e-10
@@ -217,7 +277,7 @@ class configDataset(Dataset):
                 torch.tensor(params_norm, dtype=torch.float32)
             ))
 
-        print(f"✨ Generated {len(self.data)}  samples")
+        print(f"✨ Generated {len(self.data)} samples")
 
     def __len__(self):
         return len(self.data)
@@ -255,7 +315,7 @@ class InversePINN(nn.Module):
         # Learnable positional encoding
         self.pos_embed = nn.Parameter(torch.randn(1, self.num_patches, hidden_size) * 0.02)
 
-        #  transformer blocks
+        # Transformer blocks
         self.blocks = nn.ModuleList([
             nn.Sequential(
                 SelfAttention(hidden_size, num_heads=6),
@@ -273,20 +333,23 @@ class InversePINN(nn.Module):
         self.global_pool = nn.AdaptiveAvgPool1d(1)
         self.norm_final = nn.LayerNorm(hidden_size)
 
-        #  parameter prediction with separate expert heads
+        # Updated parameter prediction with separate expert heads for 4 layers
         self.diffusion_expert = nn.Sequential(
             nn.Linear(hidden_size, hidden_size // 2),
             nn.LayerNorm(hidden_size // 2),
             nn.GELU(),
-            nn.Linear(hidden_size // 2, 2),
+            nn.Linear(hidden_size // 2, 4),  # 4 diffusion coefficients
             nn.Sigmoid()
         )
 
         self.reaction_expert = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.LayerNorm(hidden_size),
+            nn.GELU(),
             nn.Linear(hidden_size, hidden_size // 2),
             nn.LayerNorm(hidden_size // 2),
             nn.GELU(),
-            nn.Linear(hidden_size // 2, 2),
+            nn.Linear(hidden_size // 2, 4),
             nn.Sigmoid()
         )
 
@@ -294,7 +357,7 @@ class InversePINN(nn.Module):
             nn.Linear(hidden_size, hidden_size // 2),
             nn.LayerNorm(hidden_size // 2),
             nn.GELU(),
-            nn.Linear(hidden_size // 2, 2),
+            nn.Linear(hidden_size // 2, 2),  # 2 boundary conditions
             nn.Sigmoid()
         )
 
@@ -313,7 +376,7 @@ class InversePINN(nn.Module):
         x_patches = x.view(batch_size, self.num_patches, self.patch_size)
         x = self.patch_embed(x_patches) + self.pos_embed
 
-        #  transformer processing
+        # Transformer processing
         for block in self.blocks:
             attn_block, ffn_block = block
             x = attn_block(x)
@@ -324,14 +387,17 @@ class InversePINN(nn.Module):
         x = self.global_pool(x.transpose(1, 2)).squeeze(-1)
 
         # Expert predictions
-        D_params = self.diffusion_expert(x)
-        k_params = self.reaction_expert(x)
-        C_params = self.boundary_expert(x)
+        D_params = self.diffusion_expert(x)  # (batch, 4)
+        k_params = self.reaction_expert(x)  # (batch, 4)
+        C_params = self.boundary_expert(x)  # (batch, 2)
 
+        # Concatenate in the order: DIR, kIR, DOR, kOR, DFL, kFL, DCC, kCC, C0, CL
         return torch.cat([
-            D_params[:, 0:1], k_params[:, 0:1],
-            D_params[:, 1:2], k_params[:, 1:2],
-            C_params[:, 0:1], C_params[:, 1:2]
+            D_params[:, 0:1], k_params[:, 0:1],  # DIR, kIR
+            D_params[:, 1:2], k_params[:, 1:2],  # DOR, kOR
+            D_params[:, 2:3], k_params[:, 2:3],  # DFL, kFL
+            D_params[:, 3:4], k_params[:, 3:4],  # DCC, kCC
+            C_params[:, 0:1], C_params[:, 1:2]  # C0, CL
         ], dim=1)
 
 
@@ -341,47 +407,88 @@ class InversePINNLightning(pl.LightningModule):
         super().__init__()
         self.model = InversePINN()
         self.pretrain = pretrain
-        self.lambda_pde = lambda_pde
+        self.lambda_pde_max = lambda_pde
+        self.ramp_epochs = 50
         self.lr = lr
         self.save_hyperparameters()
 
-        #  parameter weighting
-        self.param_weights = torch.tensor([0.8, 4.0, 0.8, 4.0, 2.5, 2.5])
+        # Updated parameter weighting for 10 parameters
+        self.param_weights = torch.tensor([0.5, 6.0, 0.5, 6.0, 0.5, 6.0, 0.5, 6.0, 2.5, 2.5])
+
+
 
     def forward(self, x):
         return self.model(x)
 
+    def on_train_epoch_start(self):
+        if not self.pretrain:
+            # linearly ramp lambda from 0 → max over ramp_epochs
+            e = min(self.current_epoch, self.ramp_epochs)
+            self.lambda_pde = self.lambda_pde_max * (e / self.ramp_epochs)
+
     def compute_physics_loss(self, params_normalized):
-        """ physics loss with multiple constraints"""
+        """Enhanced physics loss with multiple constraints for 4 layers"""
         batch_size = params_normalized.shape[0]
         device = params_normalized.device
 
         params_denorm = denormalize_params(params_normalized)
-        D2, k2, D3, k3, C0, CL = params_denorm.unbind(dim=1)
+        DIR, kIR, DOR, kOR, DFL, kFL, DCC, kCC, C0, CL = params_denorm.unbind(dim=1)
 
         z_batch = z_torch.unsqueeze(0).expand(batch_size, -1).to(device)
-        C_pred = forward_piecewise_torch(z_batch, D2, k2, D3, k3, C0, CL)
+        C_pred = forward_piecewise_torch(z_batch, DIR, kIR, DOR, kOR, DFL, kFL, DCC, kCC, C0, CL)
 
         # Boundary conditions
         bc_loss = torch.mean((C_pred[:, 0] - C0) ** 2) + torch.mean((C_pred[:, -1] - CL) ** 2)
 
-        # Interface continuity
-        continuity_loss = torch.mean((C_pred[:, idx_interface - 1] - C_pred[:, idx_interface]) ** 2)
+        # Interface continuity at 3 interfaces
+        continuity_loss = (
+                torch.mean((C_pred[:, idx_interface1 - 1] - C_pred[:, idx_interface1]) ** 2) +
+                torch.mean((C_pred[:, idx_interface2 - 1] - C_pred[:, idx_interface2]) ** 2) +
+                torch.mean((C_pred[:, idx_interface3 - 1] - C_pred[:, idx_interface3]) ** 2)
+        )
 
+        grad = torch.diff(C_pred, dim=1) / dz
+
+        # layer diffusivities at each interface
+        D1_L, D1_R = DIR, DOR
+        D2_L, D2_R = DOR, DFL
+        D3_L, D3_R = DFL, DCC
+
+        flux1 = torch.mean((D1_L * grad[:, idx_interface1 - 1]
+                            - D1_R * grad[:, idx_interface1]) ** 2)
+        flux2 = torch.mean((D2_L * grad[:, idx_interface2 - 1]
+                            - D2_R * grad[:, idx_interface2]) ** 2)
+        flux3 = torch.mean((D3_L * grad[:, idx_interface3 - 1]
+                            - D3_R * grad[:, idx_interface3]) ** 2)
+        flux_loss = flux1 + flux2 + flux3
+        bc_w = 8.0
+        cont_w = 3.0
+        flux_w = 3.0
+        smooth_w = 0.1
+        bounds_w = 0.2
         # Smoothness constraint
-        grad = torch.diff(C_pred, dim=1)
+        grad = torch.diff(C_pred, dim=1) / dz
         smoothness_loss = torch.mean(grad ** 2)
 
         # Parameter bounds
         bounds_loss = torch.mean(torch.relu(-params_normalized) + torch.relu(params_normalized - 1))
 
-        return 8.0 * bc_loss + 3.0 * continuity_loss + 0.1 * smoothness_loss + 0.2 * bounds_loss
+        total_phys = (
+                bc_w * bc_loss
+                + cont_w * continuity_loss
+                + flux_w * flux_loss
+                + smooth_w * smoothness_loss
+                + bounds_w * bounds_loss
+        )
+
+        return total_phys
+
 
     def training_step(self, batch, batch_idx):
         C_norm, params_true = batch
         params_pred = self.model(C_norm)
 
-        #  loss combination
+        # Loss combination
         weights = self.param_weights.to(self.device)
         mse_loss = torch.mean(weights * (params_pred - params_true) ** 2)
         huber_loss = F.smooth_l1_loss(params_pred, params_true, beta=0.1)
@@ -399,7 +506,7 @@ class InversePINNLightning(pl.LightningModule):
                 physics_loss = torch.tensor(0.0, device=self.device)
                 total_loss = data_loss
 
-        #  regularization
+        # L2 regularization
         l2_reg = sum(torch.norm(p) ** 2 for p in self.model.parameters())
         total_loss = total_loss + 2e-6 * l2_reg
 
@@ -415,17 +522,18 @@ class InversePINNLightning(pl.LightningModule):
 
         weights = self.param_weights.to(self.device)
         data_loss = torch.mean(weights * (params_pred - params_true) ** 2)
+        self.log("val_data_loss", data_loss, prog_bar=True)
 
         if not self.pretrain:
-            try:
-                physics_loss = self.compute_physics_loss(params_pred)
-                total_loss = data_loss + self.lambda_pde * physics_loss
-            except:
-                total_loss = data_loss
+            # compute physics_loss
+            physics_loss = self.compute_physics_loss(params_pred)
+            total_loss = data_loss + self.lambda_pde * physics_loss
+            # **LOG THE PHYSICS TERM**
+            self.log("val_physics_loss", physics_loss, prog_bar=True)
         else:
             total_loss = data_loss
 
-        # Calculate relative errors
+        # Calculate relative errors for all 10 parameters
         params_true_denorm = denormalize_params(params_true)
         params_pred_denorm = denormalize_params(params_pred)
 
@@ -443,13 +551,13 @@ class InversePINNLightning(pl.LightningModule):
         self.log("val_loss", total_loss, prog_bar=True)
         self.log("val_avg_error", avg_rel_error, prog_bar=True)
 
+
         return total_loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             self.parameters(), lr=self.lr, weight_decay=5e-5, betas=(0.9, 0.95)
         )
-        # Fixed: T_mult must be an integer >= 1
         scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer, T_0=20, T_mult=2, eta_min=1e-7
         )
@@ -461,7 +569,7 @@ class InversePINNLightning(pl.LightningModule):
 
 # ===  EVALUATION ===
 def evaluate__model(model, dataloader):
-    """ model evaluation"""
+    """Enhanced model evaluation"""
     model.eval()
     device = next(model.parameters()).device
     all_true, all_pred = [], []
@@ -482,20 +590,27 @@ def evaluate__model(model, dataloader):
 
 # ===  TRAINING FUNCTION ===
 def run__training():
-    """ training pipeline"""
+    """Enhanced training pipeline with model persistence"""
     profile_configs = {
         f"_Profile_{i}": {name: param_ranges[name] for name in param_names}
         for i in range(1, 6)
     }
 
-    best_model, best_error = None, float('inf')
+    # Try to load previous best model
+    loaded_model, loaded_error = load_best_model()
+    best_model = loaded_model
+    best_error = loaded_error if loaded_error is not None else float('inf')
+
+    if loaded_model is not None:
+        print(f"🌟 Starting with previous best error: {best_error:.4f}")
+
     results = []
 
     for run in range(1, CONFIG['max_runs'] + 1):
         print(f"\n🏆  RUN {run}/{CONFIG['max_runs']}")
         print("=" * 50)
 
-        # Generate  dataset
+        # Generate dataset
         dataset = configDataset(profile_configs, CONFIG['samples_per_profile'])
 
         n = len(dataset)
@@ -509,9 +624,17 @@ def run__training():
         val_loader = DataLoader(val_dataset, batch_size=CONFIG['batch_size'],
                                 shuffle=False, num_workers=0, pin_memory=True)
 
-        #  Stage 1: Pretraining
+        # Stage 1: Pretraining - use loaded model if available
         print("🔥  Pretraining")
-        model = InversePINNLightning(pretrain=True, lr=CONFIG['lr_pretrain'])
+        if loaded_model is not None and run == 1:
+            # Use loaded model for first run
+            model = loaded_model
+            model.pretrain = True
+            model.lr = CONFIG['lr_pretrain']
+            print("🔄 Using loaded model as starting point")
+        else:
+            # Create fresh model for subsequent runs or if no loaded model
+            model = InversePINNLightning(pretrain=True, lr=CONFIG['lr_pretrain'])
 
         # Determine precision based on CUDA availability
         precision = "16-mixed" if torch.cuda.is_available() else "32"
@@ -531,32 +654,44 @@ def run__training():
             print(f"❌ Pretraining failed: {e}")
             continue
 
-        #  Stage 2: Physics fine-tuning
+        # Stage 2: Physics fine-tuning
         print("⚡  Physics Fine-tuning")
         model.pretrain = False
         model.lambda_pde = CONFIG['lambda_pde']
         model.lr = CONFIG['lr_finetune']
 
+        # 1. Freeze backbone parameters so only the expert heads train initially
+        for name, p in model.model.named_parameters():
+            if not any(head in name for head in ['diffusion_expert', 'reaction_expert', 'boundary_expert']):
+                p.requires_grad = False
+
+        # 2. Create the Trainer with EarlyStopping and UnfreezeCallback
         finetune_trainer = pl.Trainer(
             max_epochs=CONFIG['finetune_epochs'],
             accelerator="auto", devices="auto",
             precision=precision,
             gradient_clip_val=CONFIG['grad_clip_val'],
-            callbacks=[EarlyStopping(monitor="val_loss", patience=25, mode="min")],
+            callbacks=[
+                EarlyStopping(monitor="val_physics_loss", patience=30, mode="min"),
+                EarlyStopping(monitor="val_data_loss", patience=30, mode="min"),
+                UnfreezeCallback(unfreeze_epoch=20)
+            ],
             logger=False, enable_progress_bar=True
         )
 
         try:
+            for name, p in model.model.named_parameters():
+                if not any(head in name for head in ['diffusion_expert', 'reaction_expert', 'boundary_expert']):
+                    p.requires_grad = False
             finetune_trainer.fit(model, train_loader, val_loader)
         except Exception as e:
             print(f"❌ Fine-tuning failed: {e}")
             continue
 
-        #  evaluation
+        # Evaluation
         print("📊  Evaluation")
         try:
             y_true, y_pred = evaluate__model(model.model, val_loader)
-
             # Calculate metrics
             relative_errors = []
             for i, name in enumerate(param_names):
@@ -575,83 +710,147 @@ def run__training():
 
             results.append({'run': run, 'avg_error': avg_error, 'errors': relative_errors})
 
+            # Save model if it's the new best
             if avg_error < best_error:
                 best_error = avg_error
                 best_model = model
-                print(f"🌟 NEW  RECORD! {avg_error:.4f}")
+                save_best_model(model, avg_error, run)
+                print(f"🌟 NEW RECORD! {avg_error:.4f} - Model saved!")
 
             if avg_error < CONFIG['error_threshold']:
-                print(f"🏆  SUCCESS! {avg_error:.4f} < {CONFIG['error_threshold']}")
+                print(f"🏆 SUCCESS! {avg_error:.4f} < {CONFIG['error_threshold']}")
                 break
 
         except Exception as e:
             print(f"❌ Evaluation failed: {e}")
             continue
 
+        # Clear loaded_model flag after first run
+        if run == 1:
+            loaded_model = None
+
     return results, best_model, best_error
 
+class UnfreezeCallback(pl.Callback):
+    def __init__(self, unfreeze_epoch):
+        self.unfreeze_epoch = unfreeze_epoch
 
-# === PLOTTING UTILITIES ===
+    def on_epoch_start(self, trainer, pl_module):
+        if trainer.current_epoch == self.unfreeze_epoch:
+            for p in pl_module.model.parameters():
+                p.requires_grad = True
+            print(f"🔓 Unfroze full model at epoch {self.unfreeze_epoch}")
+
+# ===  PLOTTING UTILITIES ===
 def plot_parity(true_vals, pred_vals):
-    """Creates parity scatter plots for each parameter."""
+    """Creates parity scatter plots for each of the 10 parameters."""
     n_params = true_vals.shape[1]
     for i in range(n_params):
         plt.figure()
         plt.scatter(true_vals[:, i], pred_vals[:, i], alpha=0.6)
         lims = [true_vals[:, i].min(), true_vals[:, i].max()]
-        plt.plot(lims, lims, '--')  # 45° reference line
+        plt.plot(lims, lims, '--')
         plt.xlabel(f"True {param_names[i]}")
-        plt.ylabel(f"Predicted {param_names[i]}")
+        plt.ylabel(f"Pred {param_names[i]}")
         plt.title(f"Parity Plot: {param_names[i]}")
         plt.tight_layout()
         plt.show()
 
-
 def plot_true_vs_reconstructed(true_vals, pred_vals):
-    """Overlays true vs. reconstructed trajectories for each parameter."""
+    """Overlays true vs. reconstructed trajectories for each parameter in a 5×2 panel layout."""
     n_params = true_vals.shape[1]
+    # we'll do 5 rows × 2 columns
+    n_rows = (n_params + 1) // 2
+    fig, axes = plt.subplots(n_rows, 2, figsize=(12, n_rows*3), sharex=True)
+    axes = axes.flatten()
+
     x_axis = np.arange(true_vals.shape[0])
-    plt.figure()
+
     for i in range(n_params):
-        plt.plot(x_axis, true_vals[:, i], label=f"True {param_names[i]}")
-        plt.plot(x_axis, pred_vals[:, i], linestyle='--', label=f"Pred {param_names[i]}")
-    plt.xlabel("Sample Index")
-    plt.ylabel("Parameter Value")
-    plt.title("True vs. Reconstructed Parameter Trajectories")
-    plt.legend()
+        ax = axes[i]
+        ax.plot(x_axis, true_vals[:, i], label="True", linewidth=1)
+        ax.plot(x_axis, pred_vals[:, i], linestyle="--", label="Pred", linewidth=1)
+        ax.set_title(param_names[i])
+        ax.set_xlabel("Sample Index")
+        ax.set_ylabel(param_names[i])
+        ax.grid(True)
+
+    # turn off any unused subplots
+    for j in range(n_params, len(axes)):
+        axes[j].axis('off')
+
+    # single legend for the whole figure
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper right", bbox_to_anchor=(0.95, 0.95))
+    fig.suptitle("True vs. Reconstructed Parameter Trajectories", y=1.02, fontsize=16)
     plt.tight_layout()
     plt.show()
 
+def save_best_model(model, error, run_number, save_dir="model_checkpoints"):
+    """Save the best model with metadata"""
+    os.makedirs(save_dir, exist_ok=True)
+
+    model_data = {
+        'model_state_dict': model.model.state_dict(),
+        'error': error,
+        'run_number': run_number,
+        'param_names': param_names,
+        'param_ranges': param_ranges
+    }
+
+    save_path = os.path.join(save_dir, "best_model.pkl")
+    with open(save_path, 'wb') as f:
+        pickle.dump(model_data, f)
+
+    print(f"💾 Saved best model from run {run_number} with error {error:.4f}")
+    return save_path
+
+
+def load_best_model(save_dir="model_checkpoints"):
+    """Load the best model if it exists"""
+    save_path = os.path.join(save_dir, "best_model.pkl")
+
+    if not os.path.exists(save_path):
+        print("📂 No previous best model found - starting fresh")
+        return None, None
+
+    try:
+        with open(save_path, 'rb') as f:
+            model_data = pickle.load(f)
+
+        # Create new model instance
+        model = InversePINNLightning(pretrain=True, lr=CONFIG['lr_pretrain'])
+        model.model.load_state_dict(model_data['model_state_dict'])
+
+        prev_error = model_data['error']
+        prev_run = model_data['run_number']
+
+        print(f"🔄 Loaded previous best model from run {prev_run} with error {prev_error:.4f}")
+        return model, prev_error
+
+    except Exception as e:
+        print(f"⚠️  Failed to load previous model: {e}")
+        return None, None
 
 if __name__ == "__main__":
-    print("🚀  INVERSE PINN - STATE OF ART")
+    print("🚀 INVERSE PINN – 4‑LAYER RETINAL O₂ MODEL")
     print("=" * 60)
-
 
     try:
         results, best_model, best_error = run__training()
 
         if results:
-            print(f"\n🏆  FINAL RESULTS")
+            print(f"\n🏆 FINAL RESULTS")
             print("=" * 50)
-
-            best_result = min(results, key=lambda x: x['avg_error'])
-            best_run = best_result['run']
+            best_run = min(results, key=lambda x: x['avg_error'])['run']
+            best_entry = next(r for r in results if r['run'] == best_run)
             print(f"\n🥇 Champion Run: {best_run}")
-            print(f"🎯  Error: {best_result['avg_error']:.4f} ({best_result['avg_error'] * 100:.2f}%)")
+            print(f"🎯 Error: {best_entry['avg_error']:.4f} ({best_entry['avg_error'] * 100:.2f}%)")
             for i, name in enumerate(param_names):
-                err = best_result['errors'][i]
-                print(f"  {name}: {err:.4f} ({err * 100:5.2f}%)")
-            if best_error <= 0.05:
-                print("\n🏆 LEGENDARY! World-class inverse problem solver!")
-            elif best_error <= 0.08:
-                print("\n🥇 ! State-of-art performance achieved!")
-            elif best_error <= 0.12:
-                print("\n🥈 EXCELLENT! Superior accuracy demonstrated!")
-            else:
-                print("\n📈 SOLID! Strong foundation for further optimization!")
+                err = best_entry['errors'][i]
+                print(f"  {name:>3}: {err:.4f} ({err * 100:5.2f}%)")
 
-            # Reconstruct the same validation loader for the champion run
+            # Reconstruct champion validation set
             profile_configs = {
                 f"_Profile_{i}": {name: param_ranges[name] for name in param_names}
                 for i in range(1, 6)
@@ -663,44 +862,22 @@ if __name__ == "__main__":
                 full_dataset, [train_len, val_len],
                 generator=torch.Generator().manual_seed(42 + best_run)
             )
-            val_loader = DataLoader(val_subset, batch_size=CONFIG['batch_size'],
-                                    shuffle=False, num_workers=0, pin_memory=True)
+            val_loader = DataLoader(
+                val_subset, batch_size=CONFIG['batch_size'],
+                shuffle=False, num_workers=0, pin_memory=True
+            )
 
             # Evaluate & plot
             y_true, y_pred = evaluate__model(best_model.model, val_loader)
             plot_parity(y_true.numpy(), y_pred.numpy())
-
-            # pick a random subset of validation examples
-            n_plots = 75
-            z_grid = np.linspace(0, 1, 800)  # same high resolution you trained on
-            idxs = np.random.choice(len(y_true), size=n_plots, replace=False)
-
-            plt.figure(figsize=(10, 6))
-            for idx in idxs:
-                params_t = y_true[idx]  # true params for sample idx
-                params_p = y_pred[idx]  # predicted params
-
-                # reconstruct both profiles with your analytic forward model
-                C_true = forward_piecewise_precise(z_grid, *params_t)
-                C_pred = forward_piecewise_precise(z_grid, *params_p)
-
-                # dashed black = true; solid = predicted
-                plt.plot(z_grid, C_true, 'k--', alpha=0.8)
-                plt.plot(z_grid, C_pred, alpha=0.7)
-
-            plt.xlabel("Depth z (normalized)")
-            plt.ylabel("O$_2$ concentration")
-            plt.title("True (dashed black) vs Reconstructed (solid) Profiles")
-            plt.grid(True)
-            plt.tight_layout()
-            plt.show()
+            plot_true_vs_reconstructed(y_true.numpy(), y_pred.numpy())
 
         else:
-            print("❌ No successful  runs")
+            print("❌ No successful runs")
 
     except Exception as e:
-        print("❌  training error:", e)
+        print("❌ Training error:", e)
         import traceback
         traceback.print_exc()
 
-    print(f"\n🎬  training completed!")
+    print("\n🎬 Training completed!")
