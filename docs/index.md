@@ -1,4 +1,7 @@
-# Retinal Oxygen Transport: Physics-Informed Modeling
+<link rel="stylesheet" href="dashboard-style.css">
+<div class="container">
+
+# Retinal Oxygen Transport: Physics-Informed Modeling 
 
 *Revolutionizing Computational Ophthalmology with AI-Driven Solutions*
 
@@ -9,22 +12,47 @@
 
 ---
 
+<div class="highlight-section">
+
 ## 🎯 Project Impact
 
 **Breaking new ground in retinal disease understanding through advanced computational modeling.**
 
-Our research unites classical numerical schemes with state-of-the-art physics-informed neural networks (PINNs) to model oxygen diffusion and consumption in the human retina’s multilayer structure. By delivering both highly accurate simulations and robust parameter inference, we open new avenues for personalized diagnostics and treatment planning in diseases like diabetic retinopathy and macular degeneration.
+Our research unites classical numerical schemes with state-of-the-art physics-informed neural networks (PINNs) to model oxygen diffusion and consumption in the human retina's multilayer structure. By delivering both highly accurate simulations and robust parameter inference, we open new avenues for personalized diagnostics and treatment planning in diseases like diabetic retinopathy and macular degeneration.
+
+</div>
 
 ### Key Statistics
 
-* **200 million+** people worldwide affected by diabetic retinopathy
-* **95 % accuracy** in parameter estimation from noisy clinical data
-* **100× faster** inference versus traditional solvers
-* **4 distinct methodologies** developed and benchmarked
+<div class="stats-grid">
+  <div class="stat-card purple">
+    <h3>Global Impact</h3>
+    <div class="stat-number">200M+</div>
+    <p>People worldwide affected by diabetic retinopathy</p>
+  </div>
+  
+  <div class="stat-card yellow">
+    <h3>Accuracy</h3>
+    <div class="stat-number">95%</div>
+    <p>Accuracy in parameter estimation from noisy clinical data</p>
+  </div>
+  
+  <div class="stat-card cyan">
+    <h3>Performance</h3>
+    <div class="stat-number">100×</div>
+    <p>Faster inference versus traditional solvers</p>
+  </div>
+  
+  <div class="stat-card red">
+    <h3>Methods</h3>
+    <div class="stat-number">4</div>
+    <p>Distinct methodologies developed and benchmarked</p>
+  </div>
+</div>
 
 ---
 
-## 🔬 What We’ve Accomplished
+## 🔬 What We've Accomplished
 
 ### 1. Classical Numerical Methods
 
@@ -49,8 +77,8 @@ Our research unites classical numerical schemes with state-of-the-art physics-in
 ## 📈 Key Results & Visual Summaries
 
 ### FVM 
- It is subdivides the domain into control volumes and enforces exact conservation of mass by integrating fluxes across each cell’s faces, typically with backward-Euler discretization for stability.
-FVM provides our benchmark steady-state solution. We validate its outputs against the analytical steady-state profile and against COMSOL’s stationary study. These results serve as the reference for assessing the accuracy of our inverse PINN and forward PINN.
+ It is subdivides the domain into control volumes and enforces exact conservation of mass by integrating fluxes across each cell's faces, typically with backward-Euler discretization for stability.
+FVM provides our benchmark steady-state solution. We validate its outputs against the analytical steady-state profile and against COMSOL's stationary study. These results serve as the reference for assessing the accuracy of our inverse PINN and forward PINN.
 
 <p align="center">  
   <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/STEADYSTATE.png
@@ -216,3 +244,5 @@ This page highlights our top results and innovations. For comprehensive derivati
 ```
 
 **Transforming computational ophthalmology, one equation at a time.** 🔬👁️
+
+</div>
