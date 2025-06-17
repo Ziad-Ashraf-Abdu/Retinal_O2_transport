@@ -1,0 +1,35 @@
+# Core Scientific Stack
+numpy>=1.21.0
+scipy>=1.7.0
+matplotlib>=3.5.0
+
+# Deep Learning
+torch>=2.0.0
+pytorch-lightning>=2.0.0
+
+# Numerical Computing & Optimization
+numba>=0.56.0
+scikit-learn>=1.0.0
+
+# Progress Bars & Utilities
+tqdm>=4.65.0
+pyyaml>=6.0.0
+
+# Optional: DeepXDE (for future forward PINN)
+# deepxde>=1.0.0
+
+# Testing & Development
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=4.0.0
+
+# Version Control
+GitPython>=3.1.0
+
+# Notebook Support (Optional)
+jupyter>=1.0.0
+ipython>=8.0.0
+
+# Plotting Enhancements
+seaborn>=0.12.0

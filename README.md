@@ -54,21 +54,29 @@ The main goal is to quantify and contrast **accuracy**, **computational cost**, 
 ## Repository Structure
 
 ```
-Retinal_O2_transport/
-├── O2_profile.py               # Main script: numerical solvers + inverse PINN
-├── requirements.txt            # Python dependencies
-├── numerical/                  # Numerical method modules
-│   ├── fdm.py                  # FDM implementation (steady & time‑dependent)
-│   └── fvm.py                  # FVM implementation (steady & time‑dependent)
-├── pinn/                       # PINN modules (forward & inverse)
-│   ├── forward_pinn.py         # (Coming Soon) Forward PINN model
-│   └── inverse_pinn.py         # Inverse PINN model classes
-├── data/                       # Synthetic profile storage
-│   └── readme_profiles/        # Example saved profiles
-├── masterpiece_checkpoints/    # Inverse PINN model checkpoints
-├── figures/                    # Generated plots (parity, reconstructions)
-├── 4 Retinal O2 transport.pdf  # Schiesser’s four‑layer PDE derivation
-└── README.md                   # This document
+RETINA/
+│
+├── Analytical Solution/           # Contains analytical/benchmark results
+│   ├── plots/                     # Visualizations of the analytical solutions
+│   ├── steady_state_fv.py        # Finite volume solution for steady-state
+│   ├── Steady state.py           # Analytical steady-state script
+    ├── test.py
+|   ├── time dependent_LASTVERSION.py  
+│   └── Time dependent.py         # Analytical time-dependent solution
+│
+├── Inverse Model/                # PINN implementation for the inverse problem
+│   ├── lightning_logs/           # Logging from PyTorch Lightning
+│   ├── model_checkpoints/        # Saved model checkpoints
+│   ├── plots/                    # Model-generated plots
+│   └── O2_profile.py             # PINN for inverse oxygen profile modeling
+│
+├── Forward Model/ 
+│   └── ...                       
+
+├── .gitignore                    # Git ignored files
+├── README.md                     # Project overview and instructions
+└── requirements.txt              # Python dependencies
+
 ```
 
 ---
@@ -82,12 +90,19 @@ Retinal_O2_transport/
    cd Retinal_O2_transport
    ```
 2. **Create and activate a virtual environment**
+   * With venv
 
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate       # Linux/macOS
    .venv\Scripts\activate.bat      # Windows
    ```
+   * With conda
+   ```bash
+   conda create -n myenv python=3.9
+   conda activate myenv
+   ```
+
 3. **Install dependencies**
 
    ```bash
@@ -199,7 +214,7 @@ Modify these to suit your computational budget and desired accuracy.
 
 The forward PINN will implement:
 
-* Mesh‑free collocation using `pinnstorch` or `DeepXDE`
+* Mesh‑free collocation using `DeepXDE`
 * A fully connected neural network embedding $z$ (and $t$ if unsteady)
 * PDE residual losses for each layer (piecewise coefficients)
 * Boundary and interface continuity terms
@@ -286,7 +301,7 @@ Use these to compare classical vs. PINN performance in terms of:
 
 * **Zeyad A. Abdu** – Lead inverse PINN design, assesting in COMSOL implemtation, repo management.
 * **Suhila T. Elmasry** – Numerical FVM implementation & validation, Documentation.
-* **Rahma F. Hamouda Edress** – Forward model design.
+* **Rahma F. Hamouda Edress** – Leading forward model design.
 * **Haneen M. Gameel** – Numerical FVM implementation & validation, Documentation.
 * **Ahmed W. A. Naem** – Numerical FDM implementation & validation.
 * **Saif M. Ali** – Forward model design, repo management.

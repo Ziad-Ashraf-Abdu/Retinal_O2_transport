@@ -1,31 +1,58 @@
-# ─── Virtual Environments ──────────────────────────────────────────────
-.env/
-.venv/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# PyTorch Lightning logs and checkpoints
+lightning_logs/
+model_checkpoints/
+
+# Visualizations and plots
+**/plots/
+
+# Virtual environment
 venv/
+.env/
+env/
+.venv/
 
-# ─── IDE & Editor Files ────────────────────────────────────────────────
-# JetBrains IDEs
-.idea/
-*.iml
-workspace.xml
-
-# VSCode
+# VSCode and IDE-specific
 .vscode/
+.idea/
 
-# ─── Jupyter Notebooks ─────────────────────────────────────────────────
-.ipynb_checkpoints/
+# System files
+.DS_Store
+Thumbs.db
 
-# ─── PyTorch Lightning Artifacts ──────────────────────────────────────
-lightning_logs/      # default logs folder
-checkpoints/         # model checkpoints
+# Python egg and packaging
+*.egg-info/
+*.egg
+dist/
+build/
 
-# ─── Synthetic Data & Caches ──────────────────────────────────────────
-synthetic_profiles/  # generated .npz profiles
-httpRequests/        # HTTP Client requests
-dataSources/         # data source configs
-dataSources.local.xml
-
-# ─── Miscellaneous ────────────────────────────────────────────────────
-# Add here any other temp files, log files, etc.
+# Testing, profiling, coverage
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+.cache/
 *.log
-*.npz
+
+# Runtime files
+*.pkl
+*.h5
+*.pt
+*.ckpt
+
+# Env config
+.env
+*.env
+
+# Misc
+*.swp
