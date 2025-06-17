@@ -1,179 +1,317 @@
-# Retinal Oxygen Transport via Physics-Informed Neural Networks (PINNs)
+# Retinal O₂ Transport: Numerical & Machine‑Learning Methods
+## Table of Contents
 
-This repository implements a Physics-Informed Neural Network (PINN) model to estimate physiologically meaningful parameters governing oxygen diffusion and consumption in the retina. The goal is to reconstruct hidden tissue characteristics such as diffusion coefficients and metabolic consumption rates from spatial oxygen concentration profiles.
+1. [Project Overview](#project-overview)
+2. [Scientific Motivation](#scientific-motivation)
+3. [Repository Structure](#repository-structure)
+4. [Installation](#installation)
+5. [Usage](#usage)
+6. [Configuration](#configuration)
+7. [Numerical Solution Methods](#numerical-solution-methods)
 
-> ⚠️ Currently, this version focuses on two retinal layers. Support for all four retinal layers (choroid, outer retina, inner retina, vitreous) will be added soon. The framework is fully extensible.
+   * Finite‑Difference Method (FDM)
 
-## 🔬 Background & Reference
+     * Steady‑State Solver
+     * Time‑Dependent Solver (Forward Euler)
+   * Finite‑Volume Method (FVM)
 
-This project is inspired by the classical physiological modeling described in the publication:
+     * Steady‑State Solver
+     * Time‑Dependent Solver (Backward Euler)
+8. [Forward PINN Model (Coming Soon)](#forward-pinn-model-coming-soon)
+9. [Inverse PINN Model](#inverse-pinn-model)
 
-> "Retinal Oxygen Transport: A Mathematical Model" – (Refer to `4 Retinal O2 transport.pdf` in the repo)
-
-The PDE governing steady-state oxygen transport in each layer is a 1D diffusion-reaction equation:
-
-$$
-D_i \frac{d^2 C_i}{dz^2} - k_i C_i = 0
-$$
-
-Where:
-
-* $D_i$: Diffusion coefficient for layer $i$
-* $k_i$: Consumption rate in layer $i$
-* $C_i(z)$: Oxygen concentration at depth $z$
-
-## 📌 Problem Statement
-
-This project implements an inverse PINN that:
-
-* Accepts spatial oxygen concentration profiles as input (e.g. from sensors or synthetic simulations)
-* Predicts the underlying biophysical parameters: diffusion coefficients (D2, D3), metabolic rates (k2, k3), and boundary concentrations (C0, CL)
-
-## 🧠 Why PINNs?
-
-Unlike traditional black-box models, Physics-Informed Neural Networks:
-
-* Embed PDEs directly into the training loss
-* Require less data by leveraging known physical laws
-* Provide interpretable parameters that satisfy physiological constraints
-
-We use `pinnstorch`, a PyTorch Lightning-compatible PINN library.
-
-Inspired by:
-
-* [https://github.com/rezaakb/pinns-torch.git](https://github.com/rezaakb/pinns-torch.git)
-
-## 📂 Repository Structure
-
-```
-├── O2_profile.py           # Main training & evaluation script
-├── requirements.txt        # All Python dependencies
-├── 4 Retinal O2 transport.pdf  # Foundational reference for PDE model
-├── InnerRetina.pdf         # Additional validation literature
-├── enhanced_profiles/      # Directory storing generated data
-├── enhanced_checkpoints/   # Folder for saved models
-├── output images/          # Parity plots, reconstructions, error visualizations
-```
-
-## 🔍 Features
-
-* Residual-based PINN training with boundary constraints
-* Custom network architecture with attention and multi-head output
-* Robust parameter normalization & physical constraints
-* Enhanced visualization for parity plots and reconstructed profiles
-* Support for multiple training runs and early stopping
-
-## 📊 Parameters Estimated
-
-* D2: Diffusion coefficient for second layer
-* D3: Diffusion coefficient for third layer
-* k2: Metabolic rate in second layer
-* k3: Metabolic rate in third layer
-* C0: Oxygen concentration at z = 0
-* CL: Oxygen concentration at z = L
-
-➡️ Note: Upcoming versions will include D1, k1 (outer retina) and D4, k4 (vitreous)
-
-## 🚀 How to Run
-
-### 🟢 Recommended: Google Colab
-
-PINNs are computationally demanding. For ease of use and free GPU support:
-
-1. Visit Google Colab: [https://colab.research.google.com](https://colab.research.google.com)
-2. Upload `O2_profile.py`
-3. Make sure the runtime type is set to `GPU`
-4. Install requirements using:
-
-```bash
-!pip install -r requirements.txt
-```
-
-5. Run the script and monitor training curves.
-
-Colab Tip:
-
-* If you encounter timeout errors, reduce the number of profiles or training epochs in the config section.
+   * Data Generation (`MasterpieceDataset`)
+   * Network Architecture (`MasterpieceInversePINN`, `EnhancedAttentionBlock`)
+   * Training Pipeline (`MasterpieceLightning`)
+   * Physics‑Informed Loss Components
+10. [Evaluation & Output](#evaluation--output)
+11. [Authors & Contributions](#authors--contributions)
+12. [References](#references)
 
 ---
 
-### 🖥️ Local Run (Advanced)
+## Project Overview
 
-Make sure Python 3.9+ and PyTorch (with CUDA support) are installed.
+This repository implements and compares four distinct computational schemes for modeling oxygen transport in the retina’s layered structure:
 
-1. Clone the repo:
+1. **Finite‑Difference Method (FDM)** – both steady‑state and explicit time‑dependent solvers.
+2. **Finite‑Volume Method (FVM)** – both steady‑state and implicit time‑dependent solvers.
+3. **Forward Physics‑Informed Neural Network (Forward PINN)** – a mesh‑free, PDE‑embedded neural solver (to be released imminently).
+4. **Inverse PINN** – learns layer parameters $(D_i, k_i)$ and boundary concentrations $(C_0, C_L)$ directly from simulated or measured oxygen profiles.
 
-```bash
-git clone https://github.com/Ziad-Ashraf-Abdu/Retinal_O2_transport.git
-cd Retinal_O2_transport
-```
-
-2. Create a virtual environment (optional but recommended):
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # on Windows: .venv\Scripts\activate
-```
-
-3. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-4. Run:
-
-```bash
-python O2_profile.py
-```
-
-Training will start and save checkpoints in `enhanced_checkpoints/`.
-
-## 📈 Outputs
-
-* `enhanced_parity_plots.png`: Predicted vs True values for each parameter
-* `enhanced_profile_reconstructions.png`: Visual reconstruction of O2 profiles
-* `enhanced_error_analysis.png`: Error trends, boxplots, and correlation
-
-## 🧪 Sample Results
-
-Initial results show the model is capable of estimating parameters with good relative accuracy. See the visualizations for more insights.
-
-Average error after tuning (target < 10%):
-
-* D2: \~6%
-* k2: \~8%
-* D3: \~5%
-* k3: \~7%
-* C0/CL: \~4%
-
-## 🧑‍🤝‍🧑 Authors
-
-This project was developed as a collaborative research project by:
-
-* Zeyad Ashraf \[github.com/Ziad-Ashraf-Abdu]
-* \[Teammate 1] – Focused on Inner Retina PDE formulation
-* \[Teammate 2] – Validation, PINNs integration, evaluation
-
-Feel free to open issues or contact us for questions and suggestions.
+The main goal is to quantify and contrast **accuracy**, **computational cost**, and **data requirements** of classical numerical schemes versus physics‑informed machine learning approaches in a four‑layer retinal setting.
 
 ---
 
-## 📚 References
+## Scientific Motivation
 
-1. \[Main PDE Reference] 4 Retinal O2 Transport.pdf
-2. pinnstorch GitHub: [https://github.com/rezaakb/pinns-torch.git](https://github.com/rezaakb/pinns-torch.git)
-3. Physics-Informed Neural Networks (Raissi et al. 2019)
-
----
-
-## 🌟 Future Plans
-
-* Add support for all 4 layers
-* Integrate real patient data (if available)
-* Enable time-dependent modeling (non-steady-state)
-* Extend to 2D/3D retinal slices
+* **Biological Context:** Photoreceptors in the outer retina have high metabolic demand; oxygen must diffuse from vitreous and choroid through four distinct layers, each with unique diffusivity $D_i$ and consumption rate $k_i$.
+* **Clinical Relevance:** Impaired transport underlies diabetic retinopathy and age‑related macular degeneration. Fast, accurate parameter estimation could guide personalized therapies.
+* **Computational Challenge:** Classical solvers require dense meshes and repeated forward solves for inverse problems. PINNs aim to reduce mesh dependence and enable direct parameter inference.
 
 ---
 
-Made with 🧠 + ❤️ for computational physiology and medical AI.
+## Repository Structure
+
+```
+Retinal_O2_transport/
+├── O2_profile.py               # Main script: numerical solvers + inverse PINN
+├── requirements.txt            # Python dependencies
+├── numerical/                  # Numerical method modules
+│   ├── fdm.py                  # FDM implementation (steady & time‑dependent)
+│   └── fvm.py                  # FVM implementation (steady & time‑dependent)
+├── pinn/                       # PINN modules (forward & inverse)
+│   ├── forward_pinn.py         # (Coming Soon) Forward PINN model
+│   └── inverse_pinn.py         # Inverse PINN model classes
+├── data/                       # Synthetic profile storage
+│   └── readme_profiles/        # Example saved profiles
+├── masterpiece_checkpoints/    # Inverse PINN model checkpoints
+├── figures/                    # Generated plots (parity, reconstructions)
+├── 4 Retinal O2 transport.pdf  # Schiesser’s four‑layer PDE derivation
+└── README.md                   # This document
+```
+
+---
+
+## Installation
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/Ziad-Ashraf-Abdu/Retinal_O2_transport.git
+   cd Retinal_O2_transport
+   ```
+2. **Create and activate a virtual environment**
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate       # Linux/macOS
+   .venv\Scripts\activate.bat      # Windows
+   ```
+3. **Install dependencies**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+---
+
+## Usage
+
+### 1. Numerical Solvers Only
+
+```bash
+python O2_profile.py --method fdm --mode steady
+python O2_profile.py --method fdm --mode transient
+python O2_profile.py --method fvm --mode steady
+python O2_profile.py --method fvm --mode transient
+```
+
+These commands will:
+
+* Discretize the four‑layer domain in $z\in[0,1]$
+* Solve the PDE using specified method and mode
+* Plot and save results to `figures/num_*`
+
+### 2. Inverse PINN Training
+
+```bash
+python O2_profile.py --train inverse
+```
+
+This:
+
+* Generates synthetic profiles via the four‑layer analytical forward solver
+* Trains the `MasterpieceLightning` module through pretraining and physics‑fine‑tuning
+* Saves parity plots, reconstructions, and summary metrics
+
+### 3. Forward PINN (Future)
+
+```bash
+python O2_profile.py --train forward_pinn
+```
+
+> **Note:** The forward PINN implementation will be added in the `pinn/forward_pinn.py` module. It requires installing `pinnstorch` or `DeepXDE`.
+
+---
+
+## Configuration
+
+All key hyperparameters are defined at the top of `O2_profile.py`:
+
+```python
+MAX_RUNS = 5
+PRETRAIN_EPOCHS = 200
+FINETUNE_EPOCHS = 300
+LR_PRETRAIN = 2e-3
+LR_FINETUNE = 1e-4
+BATCH_SIZE = 64
+GRAD_CLIP_VAL = 0.5
+
+z_np = np.linspace(0, 1, 1000, dtype=np.float32)  # Domain discretization
+idx_interfaces = [250, 500, 750]                  # Layer boundaries
+param_ranges = {
+    'D1':(...), 'k1':(...),
+    'D2':(...), 'k2':(...),
+    'D3':(...), 'k3':(...),
+    'D4':(...), 'k4':(...),
+    'C0':(...), 'C_L':(...)
+}
+```
+
+Modify these to suit your computational budget and desired accuracy.
+
+---
+
+## Numerical Solution Methods
+
+### Finite‑Difference Method (FDM)
+
+#### Steady‑State Solver
+
+* Discretizes $\frac{d^2C}{dz^2} - \frac{k(z)}{D(z)}\,C = 0$ with central differences on a uniform grid.
+* Enforces flux continuity at interfaces via harmonic means of $D$.
+* Solves resulting tridiagonal linear system with Thomas algorithm.
+
+#### Time‑Dependent Solver (Explicit Forward Euler)
+
+* Approximates $\partial_t C = D(z)\,\partial_{zz}C - k(z)\,C$ via Forward Euler and central spatial differences.
+* Handles interface diffusion coefficients with harmonic or arithmetic means.
+* Simple but subject to CFL stability constraint: $\Delta t \le \Delta z^2/(2\max D)$.
+
+### Finite‑Volume Method (FVM)
+
+#### Steady‑State Solver
+
+* Integrates diffusion–reaction equation over control volumes.
+* Applies divergence theorem to get flux differences at cell faces.
+* Enforces boundary/tridiagonal continuity via arithmetic means at interfaces.
+
+#### Time‑Dependent Solver (Backward Euler)
+
+* Temporal discretization via implicit backward Euler for unconditional stability.
+* Assembles and solves a sparse linear system $A\,C^{n+1}=C^n$ at each timestep.
+* Accurate but requires solving large linear systems (sparse LU).
+
+---
+
+## Forward PINN Model (Coming Soon)
+
+The forward PINN will implement:
+
+* Mesh‑free collocation using `pinnstorch` or `DeepXDE`
+* A fully connected neural network embedding $z$ (and $t$ if unsteady)
+* PDE residual losses for each layer (piecewise coefficients)
+* Boundary and interface continuity terms
+* GPU acceleration via PyTorch Lightning
+
+---
+
+## Inverse PINN Model
+
+### Data Generation: `MasterpieceDataset`
+
+* **Synthetic Profiles:**
+
+  * Four‑layer analytical solver (`forward_piecewise_analytical`) with robust linear algebra.
+  * High‑SNR noise model using signal‑to‑noise ratio sampling.
+* **Normalization:**
+
+  * Profile normalization via median & standard deviation.
+  * Parameter normalization to $[0,1]$ based on `param_ranges`.
+
+### Network Architecture
+
+#### `EnhancedAttentionBlock`
+
+* Multi‑head self‑attention (batch‑first)
+* Feed‑forward residual sublayers with GELU activation
+* Learnable residual scaling factors $\alpha_1,\alpha_2$
+
+#### `MasterpieceInversePINN`
+
+1. **Patch Embedding:**
+
+   * Divides 1D input into patches (size= 8); project via `Linear` + positional encoding
+2. **Transformer Blocks:**
+
+   * Stacks of `EnhancedAttentionBlock`
+3. **Pooling & Heads:**
+
+   * Adaptive avg & max pooling → concatenation → three specialized MLP heads
+   * **Diffusion Head:** predicts \\(\[D\_1,D\_2,D\_3,D\_4]\\)
+   * **Reaction Head:** predicts \\(\[k\_1,k\_2,k\_3,k\_4]\\)
+   * **Boundary Head:** predicts \\(\[C\_0,C\_L]\\)
+
+### Training Pipeline: `MasterpieceLightning`
+
+* **Pretraining Stage:**
+
+  * Optimizes data‐fidelity loss (weighted MSE + Huber + MAE)
+  * Early stopping on validation loss
+* **Physics Fine‑Tuning:**
+
+  * Adds composite physics loss:
+
+    1. Dirichlet boundary MSE
+    2. PDE residuals (finite‑difference second derivatives)
+    3. Concentration & flux continuity at three interfaces
+    4. Smoothness and parameter‐bound penalties
+  * Two‐stage optimizer schedule (AdamW, CosineAnnealingWarmRestarts)
+
+---
+
+## Evaluation & Output
+
+After training, the script automatically:
+
+1. **Generates Figures** (`plots/`):
+
+   * **Parity Plots**: True vs. predicted parameters, ±10 % bands
+   * **Profile Reconstructions**: Best, worst, and random sample overlays
+   * **Error Analysis**: Run‐wise error evolution, boxplots, correlation heatmaps
+2. **Saves Model Checkpoints** (`masterpiece_checkpoints/`)
+3. **Writes Summary** (`masterpiece_summary.json`) with best-run metrics
+
+Use these to compare classical vs. PINN performance in terms of:
+
+* **Accuracy** (relative error, RMSE, R²)
+* **Compute Time** (CPU vs. GPU, mesh points vs. collocation points)
+* **Data Requirements** (synthetic vs. experimental)
+* **Ease of Extension** (adding layers, unsteady terms)
+
+---
+
+## Authors & Contributions
+
+* **Zeyad A. Abdu** – Lead inverse PINN design, assesting in COMSOL implemtation, repo management.
+* **Suhila T. Elmasry** – Numerical FVM implementation & validation, Documentation.
+* **Rahma F. Hamouda Edress** – Forward model design.
+* **Haneen M. Gameel** – Numerical FVM implementation & validation, Documentation.
+* **Ahmed W. A. Naem** – Numerical FDM implementation & validation.
+* **Saif M. Ali** – Forward model design, repo management.
+* **Ahmed M. Abdelsalam** – Lead COMSOL implementation, assesting in inverse PINN validation.
+* **Mohanud H. Abdelnaby** – Documentation, presentation, and repo management.
+
+---
+
+## References
+
+
+1. W. E. Schiesser, *Differential Equation Analysis in Biomedical Science and Engineering: Case Studies with MATLAB*, Cambridge University Press, 2013, ch. 4, “Retinal O₂ transport.”
+2. D. Y. Yu and S. J. Cringle, “Oxygen distribution and consumption in the retina: Modeling and measurement,” *Bioengineering Department*, University of Illinois at Urbana–Champaign, Tech. Rep., 2002.
+3. M. Raissi, P. Perdikaris, and G. E. Karniadakis, “Physics‐Informed Neural Networks: A Deep Learning Framework for Solving Forward and Inverse Problems Involving Nonlinear Partial Differential Equations,” *Journal of Computational Physics*, vol. 378, pp. 686–707, Feb. 2019.
+4. L. Lu, P. Jin, and G. E. Karniadakis, “DeepXDE: A Deep Learning Library for Solving Differential Equations,” *SIAM Review*, vol. 63, no. 1, pp. 208–228, 2021.
+5. SciANN, “SciANN: A Keras‐based, high‐level API for physics‐informed neural networks,” 2024. \[Online]. Available: [https://www.sciann.com](https://www.sciann.com)
+6. A. Toledo‐Marín *et al.*, “Convolutional Surrogate Modeling of Multiphase Flow in Porous Media,” in *Proc. NeurIPS ML for Physical Sciences Workshop*, 2021.
+7. J. Seman, “Adaptive Physics‐Informed Neural Networks for Reaction‐Diffusion Systems,” *Frontiers in Physics*, vol. 8, p. 632, 2020.
+8. H. Y. Zhu *et al.*, “PINN for Piecewise Coefficient PDEs,” *ETNA*. vol. 56, pp. 1–27, 2022.
+9. J. D. Liu *et al.*, “3D Image‐based Arterial Network Modeling of Retinal Oxygen Tension,” *IEEE Trans. Biomedical Engineering*, vol. 56, no. 9, pp. 2345–2354, Sep. 2009.
+10. E. Aquah *et al.*, “CFD Modeling of Retinal Ischemia and Hemoglobin Affinity Effects,” *Computers in Biology and Medicine*, vol. 131, p. 104234, 2021.
+11. E. J. McHugh *et al.*, “3D Finite‐Element Diffusion Modeling of Hypoxia in AMD from OCT Scans,” *PLOS One*, vol. 14, no. 6, e0216215, 2019.
+12. S. A. Spencer *et al.*, “In Vivo Measurement of Retinal Oxygen Tension Gradients,” *Invest. Ophthalmol. Vis. Sci.*, vol. 54, no. 6, pp. 4060–4067, Jun. 2013.
+13. A. Xiaowei *et al.*, “Integrating Physics‐Based Modeling with Machine Learning: A Survey,” 2020. \[Online]. Available: [https://beiyulincs.github.io/teach/fall\_2020/papers/xiaowei.pdf](https://beiyulincs.github.io/teach/fall_2020/papers/xiaowei.pdf)
+14. “Mass diffusivity,” *Wikipedia*, 2024. \[Online]. Available: [https://en.wikipedia.org/wiki/Mass\_diffusivity](https://en.wikipedia.org/wiki/Mass_diffusivity)
+15. “Physics‐Based Deep Learning,” 2024. \[Online]. Available: [https://physicsbaseddeeplearning.org/intro.html](https://physicsbaseddeeplearning.org/intro.html)
+
+

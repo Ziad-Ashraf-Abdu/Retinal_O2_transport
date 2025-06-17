@@ -427,7 +427,7 @@ class InversePINNLightning(pl.LightningModule):
             self.lambda_pde = self.lambda_pde_max * (e / self.ramp_epochs)
 
     def compute_physics_loss(self, params_normalized):
-        """Enhanced physics loss with multiple constraints for 4 layers"""
+        """Enhanced physics loss with proper gradient handling at interfaces"""
         batch_size = params_normalized.shape[0]
         device = params_normalized.device
 
@@ -440,38 +440,66 @@ class InversePINNLightning(pl.LightningModule):
         # Boundary conditions
         bc_loss = torch.mean((C_pred[:, 0] - C0) ** 2) + torch.mean((C_pred[:, -1] - CL) ** 2)
 
-        # Interface continuity at 3 interfaces
+        # Interface continuity (concentration)
         continuity_loss = (
                 torch.mean((C_pred[:, idx_interface1 - 1] - C_pred[:, idx_interface1]) ** 2) +
                 torch.mean((C_pred[:, idx_interface2 - 1] - C_pred[:, idx_interface2]) ** 2) +
                 torch.mean((C_pred[:, idx_interface3 - 1] - C_pred[:, idx_interface3]) ** 2)
         )
 
-        grad = torch.diff(C_pred, dim=1) / dz
+        # Improved gradient calculation using central differences where possible
+        # For interior points, use central difference: (C[i+1] - C[i-1]) / (2*dz)
+        # For boundaries, use forward/backward difference
 
-        # layer diffusivities at each interface
-        D1_L, D1_R = DIR, DOR
-        D2_L, D2_R = DOR, DFL
-        D3_L, D3_R = DFL, DCC
+        grad = torch.zeros_like(C_pred)
 
-        flux1 = torch.mean((D1_L * grad[:, idx_interface1 - 1]
-                            - D1_R * grad[:, idx_interface1]) ** 2)
-        flux2 = torch.mean((D2_L * grad[:, idx_interface2 - 1]
-                            - D2_R * grad[:, idx_interface2]) ** 2)
-        flux3 = torch.mean((D3_L * grad[:, idx_interface3 - 1]
-                            - D3_R * grad[:, idx_interface3]) ** 2)
+        # Forward difference at first point
+        grad[:, 0] = (C_pred[:, 1] - C_pred[:, 0]) / dz
+
+        # Central difference for interior points
+        grad[:, 1:-1] = (C_pred[:, 2:] - C_pred[:, :-2]) / (2 * dz)
+
+        # Backward difference at last point
+        grad[:, -1] = (C_pred[:, -1] - C_pred[:, -2]) / dz
+
+        # Flux continuity at interfaces (D_left * grad_left = D_right * grad_right)
+        # More accurate: use average of gradients on either side of interface
+
+        # Interface 1: Inner Retina (DIR) ↔ Outer Retina (DOR)
+        grad_left_1 = grad[:, idx_interface1 - 1]
+        grad_right_1 = grad[:, idx_interface1]
+        flux1 = torch.mean((DIR * grad_left_1 - DOR * grad_right_1) ** 2)
+
+        # Interface 2: Outer Retina (DOR) ↔ Fluid Layer (DFL)
+        grad_left_2 = grad[:, idx_interface2 - 1]
+        grad_right_2 = grad[:, idx_interface2]
+        flux2 = torch.mean((DOR * grad_left_2 - DFL * grad_right_2) ** 2)
+
+        # Interface 3: Fluid Layer (DFL) ↔ Choriocapillaris (DCC)
+        grad_left_3 = grad[:, idx_interface3 - 1]
+        grad_right_3 = grad[:, idx_interface3]
+        flux3 = torch.mean((DFL * grad_left_3 - DCC * grad_right_3) ** 2)
+
         flux_loss = flux1 + flux2 + flux3
+
+        # Smoothness constraint (penalize large second derivatives)
+        second_deriv = torch.diff(grad, dim=1) / dz
+        smoothness_loss = torch.mean(second_deriv ** 2)
+
+        # Parameter bounds constraint
+        bounds_loss = torch.mean(torch.relu(-params_normalized) + torch.relu(params_normalized - 1))
+
+        # Additional constraint: enforce physical ordering if needed
+        # For example, ensure C0 < CL (oxygen increases toward choroid)
+        ordering_loss = torch.mean(torch.relu(C0 - CL + 1.0))  # +1.0 for minimum separation
+
+        # Weighted combination
         bc_w = 8.0
         cont_w = 3.0
         flux_w = 3.0
         smooth_w = 0.1
         bounds_w = 0.2
-        # Smoothness constraint
-        grad = torch.diff(C_pred, dim=1) / dz
-        smoothness_loss = torch.mean(grad ** 2)
-
-        # Parameter bounds
-        bounds_loss = torch.mean(torch.relu(-params_normalized) + torch.relu(params_normalized - 1))
+        ordering_w = 2.0
 
         total_phys = (
                 bc_w * bc_loss
@@ -479,10 +507,10 @@ class InversePINNLightning(pl.LightningModule):
                 + flux_w * flux_loss
                 + smooth_w * smoothness_loss
                 + bounds_w * bounds_loss
+                + ordering_w * ordering_loss
         )
 
         return total_phys
-
 
     def training_step(self, batch, batch_idx):
         C_norm, params_true = batch
