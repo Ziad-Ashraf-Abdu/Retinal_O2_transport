@@ -13,8 +13,6 @@ __pycache__/
 lightning_logs/
 model_checkpoints/
 
-# Visualizations and plots
-**/plots/
 
 # Virtual environment
 venv/
