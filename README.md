@@ -24,9 +24,10 @@
    * Network Architecture (`MasterpieceInversePINN`, `EnhancedAttentionBlock`)
    * Training Pipeline (`MasterpieceLightning`)
    * Physics‑Informed Loss Components
-10. [Evaluation & Output](#evaluation--output)
-11. [Authors & Contributions](#authors--contributions)
-12. [References](#references)
+10. [COMSOL MODEL](#comsol-validation)
+11. [Evaluation & Output](#evaluation--output)
+12. [Authors & Contributions](#authors--contributions)
+13. [References](#references)
 
 ---
 
@@ -273,6 +274,41 @@ The forward PINN will implement:
     3. Concentration & flux continuity at three interfaces
     4. Smoothness and parameter‐bound penalties
   * Two‐stage optimizer schedule (AdamW, CosineAnnealingWarmRestarts)
+---
+
+## COMSOL Validation
+
+
+To ensure our numerical and PINN approaches faithfully reproduce the underlying physics—and to guard against subtle mis‑interpretations of the reference paper—we implemented an independent model in **COMSOL Multiphysics®**. This served as a “sanity check” for boundary conditions, layer‑specific parameters, and the transition between time‑dependent and steady‑state behavior.
+
+### 1. Validation Motivation
+
+* **Human fallibility**: Even well‑documented reference studies can be misread or mis‑transcribed.
+* **PDE behavior**: Our hypothesis (and literature reports) indicate that the retinal diffusion–reaction PDE behaves as transient within a finite time window, but rapidly approaches steady state thereafter.
+* **Cross‑platform confidence**: By reproducing the problem in a commercial finite‑element environment, we gain high assurance in both our parametrization and our own solvers’ implementation.
+
+### 2. COMSOL Model Setup
+
+* **Geometry & Layers**: Four contiguous 1D domains matching our Python/DeepXDE definitions (photoreceptor side → vitreous side).
+* **Material Properties**: Diffusivities $D_i$ and reaction rates $k_i$ imported directly from our code’s parameter file.
+* **Boundary & Initial Conditions**:
+
+  * $C(z,0)$ set to baseline profile.
+  * Fixed concentrations $C_0$ at the choroidal boundary and $C_L$ at the vitreal surface.
+* **Time Study**: Simulated on $t \in [0,\,T_{\text{final}}]$ with fine time sampling to capture initial transients and long‑term asymptote.
+
+### 3. Key Findings
+
+* **Transient Interval**: For $t \lesssim 5$ s (model‑dependent), the solution exhibits clear time‑varying dynamics, matching our FDM/PINN transient runs.
+* **Steady‑State Emergence**: Beyond this interval, concentration profiles converge to the same steady‑state solution predicted by our FVM solver (maximum deviation < 0.1 %).
+* **Interface Continuity**: COMSOL confirms flux continuity across layer boundaries without spurious jumps—reinforcing our handling of interface conditions in the PINN loss.
+
+
+### 5. Conclusions
+
+* **Parameter fidelity**: The match between COMSOL and our own codes confirms that our diffusivity/reaction-rate assignments and boundary conditions are correctly implemented.
+* **Model regime**: The clear transient‑to‑steady transition validates our choice to solve the time‑dependent PDE only up to the identified interval, then switch to a steady‑state solver for efficiency.
+* **Confidence boost**: This cross‑platform agreement underpins all downstream results—whether FDM, FVM, or PINN‑based.
 
 ---
 

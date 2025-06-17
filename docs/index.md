@@ -49,6 +49,8 @@ Our research unites classical numerical schemes with state-of-the-art physics-in
 ## 📈 Key Results & Visual Summaries
 
 ### FVM 
+ It is subdivides the domain into control volumes and enforces exact conservation of mass by integrating fluxes across each cell’s faces, typically with backward-Euler discretization for stability.
+FVM provides our benchmark steady-state solution. We validate its outputs against the analytical steady-state profile and against COMSOL’s stationary study. These results serve as the reference for assessing the accuracy of our inverse PINN and forward PINN.
 
 <p align="center">  
   <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/STEADYSTATE.png
@@ -57,11 +59,13 @@ Our research unites classical numerical schemes with state-of-the-art physics-in
 <p align="center">  
   <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/TIME_DEPENDENT_GRAPH.png" alt="Time Dependent FVM" width="700px"/>  
 </p> 
-*Figure 1.* concentration profile from our FVM solver compared to the analytical solution.
 
 ---
 
 ### FDM
+A discretizes the reaction–diffusion equation on a uniform spatial grid, using difference formulas for second derivatives and explicit (or implicit) time-stepping schemes.
+We employ FDM to simulate the full time-dependent evolution of oxygen concentration across all four retinal layers. This lets us quantify the characteristic stabilization time (τ) and generate transient profiles that we compare directly against COMSOL time-dependent runs and our PINN Forward Model.
+
 
 <p align="center">  
   <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/Each%20Layer%20Steady%20State.png" alt="Steady State FDM" width="700px"/>  
@@ -69,11 +73,24 @@ Our research unites classical numerical schemes with state-of-the-art physics-in
 <p align="center">  
   <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/Time Dependent Graph.png" alt="Time Dependent FDM" width="700px"/>  
 </p>  
-*Figure 2.* oncentration profile from our FDM solver compared to the analytical solution.
 
 ---
 
+### PINN Reconstruction of Oxygen Profile
+A neural collocation approach where a network is trained to satisfy the governing PDE and boundary conditions throughout the domain, producing a continuous function approximation of C(z,t).
+This model offers a purely data-driven solver for both transient and steady-state problems—no grid required. Once integrated, it will be directly compared to our FDM/FVM benchmarks for speed, accuracy, and mesh-independence.
+
+<p align="center">  
+  <img src="Inverse Model/plots/profile_reconstruction.png" alt="PINN Profile Reconstruction" width="700px"/>  
+</p>  
+*Figure 4.* Overlay of measured and PINN-predicted concentration profiles from only 10 spatial sensors per layer. L² error < 0.5 %.
+
+---
+
+
 ### Inverse PINN Parameter Recovery
+A neural network that infers unknown physical parameters (e.g. layer diffusivities 𝐷𝑖, reaction rates 𝑘𝑖, boundary concentrations) by minimizing a composite loss: PDE residuals + interface continuity + boundary enforcement + data mismatch.
+We train this model on synthetic profiles (with added noise) to recover ground-truth parameters with > 95 % accuracy and R2>0.99. Its outputs are then validated and used to demonstrate robust parameter estimation from sparse measurements.
 
 
 |                                                         |                                                         |
@@ -84,14 +101,16 @@ Our research unites classical numerical schemes with state-of-the-art physics-in
 | <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Inverse%20Model/plots/InverseModel/parity_plot_Dfl.png" alt="Fluid Layer Diffusivity Parity Plot" width="300px"/><br>| <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Inverse%20Model/plots/InverseModel/parity_plot_kfl.png" alt="Profile Reconstruction" width="300px"/><br> |
 | <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Inverse%20Model/plots/InverseModel/parity_plot_Dcc.png" alt="Outer Retina Diffusivity Parity Plot" width="300px"/><br>| <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Inverse%20Model/plots/InverseModel/parity_plot_kcc.png" alt="Profile Reconstruction" width="300px"/><br> |
 
+
 ---
 
-### PINN Reconstruction of Oxygen Profile
+### COMSOL
 
-<p align="center">  
-  <img src="Inverse Model/plots/profile_reconstruction.png" alt="PINN Profile Reconstruction" width="700px"/>  
-</p>  
-*Figure 4.* Overlay of measured and PINN-predicted concentration profiles from only 10 spatial sensors per layer. L² error < 0.5 %.
+|                                                         |                                                         |
+|:-------------------------------------------------------:|:-------------------------------------------------------:|
+| <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/COMSOL/plots/IR.jpg" alt="Inner Retina Profile" width="300px"/><br>| <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/COMSOL/plots/OR.jpg" alt="Outer Retina Profile" width="300px"/><br> |
+| <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/COMSOL/plots/FL.jpg"  width="300px"/><br>| <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/COMSOL/plots/CC.jpg" width="300px"/><br>|
+
 
 ---
 
