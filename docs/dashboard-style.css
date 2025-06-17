@@ -111,6 +111,12 @@ hr {
   margin: 3rem 0;
 }
 
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .stat-card {
   background: var(--bg-card);
   border-radius: var(--border-radius-lg);
