@@ -174,6 +174,24 @@ Modify these to suit your computational budget and desired accuracy.
 
 ## Numerical Solution Methods
 
+### Method of Lines (MOL)
+
+#### Steady‑State Solver
+
+* Discretizes ∂²u/∂z² using central finite differences on a uniform grid.
+* Forms an ODE system:  
+  du_i/dt = D_i * ( u_{i+1} - 2u_i + u_{i-1} ) / (Δz)²  - k_i * u_i
+* Enforces flux continuity at interfaces:  
+  u_interface(+) = u_interface(-)
+* Applies Dirichlet boundary conditions:  
+  u(0, t) = 20 mmHg, u(L, t) = 100 mmHg
+
+#### Time‑Dependent Solver (Backward Differentiation Formula — BDF)
+
+* Time integration using implicit BDF for stiff systems.
+* Solves ODE system with solve_ivp(method='BDF'), t ∈ [0, 30 s].
+* Stable for large time steps — accurate for reaction-diffusion in layered retina.
+
 ### Finite‑Difference Method (FDM)
 
 #### Steady‑State Solver
