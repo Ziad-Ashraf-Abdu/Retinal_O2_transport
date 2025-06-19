@@ -235,7 +235,7 @@ The **Forward Model** implements a Physics-Informed Neural Network (PINN) approa
 - `Forward Model/All_layers_Forward_Model.py`: Full four-layer PINN model with reference data integration and advanced training/visualization.
 
 ### Result matrices for each layer
-[image.png]
+![image.png]
 
 ### Typical Workflow
 
