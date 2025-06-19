@@ -33,7 +33,7 @@
 
 ## Project Overview
 
-This repository implements and compares four distinct computational schemes for modeling oxygen transport in the retina’s layered structure:
+This repository implements and compares four distinct computational schemes for modeling oxygen transport in the retina's layered structure:
 
 1. **Finite‑Difference Method (FDM)** – both steady‑state and explicit time‑dependent solvers.
 2. **Finite‑Volume Method (FVM)** – both steady‑state and implicit time‑dependent solvers.
@@ -147,7 +147,7 @@ This:
 python O2_profile.py --train forward_pinn
 ```
 
-> **Note:** The forward PINN implementation will be added in the `pinn/forward_pinn.py` module. It requires installing `pinnstorch` or `DeepXDE`.
+
 
 ---
 
@@ -211,15 +211,43 @@ Modify these to suit your computational budget and desired accuracy.
 
 ---
 
-## Forward PINN Model (Coming Soon)
+## Forward Model (PINN-based)
 
-The forward PINN will implement:
+The **Forward Model** implements a Physics-Informed Neural Network (PINN) approach to directly solve the oxygen transport PDE across the retina's four layers, using the [DeepXDE](https://github.com/lululxvi/deepxde) library. This approach provides a mesh-free, differentiable solver that can flexibly incorporate experimental or reference data, complex boundary/interface conditions, and spatially varying parameters.
 
-* Mesh‑free collocation using `DeepXDE`
-* A fully connected neural network embedding $z$ (and $t$ if unsteady)
-* PDE residual losses for each layer (piecewise coefficients)
-* Boundary and interface continuity terms
-* GPU acceleration via PyTorch Lightning
+### Key Features
+
+- **Layered PDE Formulation:**
+  - Models oxygen diffusion and consumption in four contiguous retinal layers, each with distinct diffusivity ($D_i$) and consumption rate ($k_i$).
+  - The PDE is defined piecewise, with masks ensuring correct coefficients in each spatial region.
+- **Boundary & Interface Conditions:**
+  - Dirichlet boundary conditions at the retina's boundaries, set using reference data or physiological values.
+  - Enforces continuity of concentration and flux at all layer interfaces.
+- **Reference Data Integration:**
+  - Incorporates experimental or literature-based oxygen profiles as additional constraints (via `PointSetBC`), improving physical realism and data consistency.
+- **Neural Network Architecture:**
+  - Deep, fully connected feedforward network (default: 8 layers, 256 neurons each, tanh activation).
+  - Trained with adaptive loss weighting to balance PDE, boundary, and data constraints.
+- **Training Workflow:**
+  - Multi-phase training: initial emphasis on data fit, followed by balanced and high-precision phases, and final L-BFGS optimization.
+  - Uses both Adam and L-BFGS optimizers for robust convergence.
+- **Validation & Visualization:**
+  - Evaluates model predictions against reference data for each layer (MAE, RMSE, MAPE).
+  - Generates comprehensive plots: predicted vs. reference profiles, error curves, and per-layer performance metrics.
+  - Example output figures are saved in `Forward Model/plots/`.
+
+### Example Scripts
+
+- `Forward Model/All_layers_Forward_Model.py`: Full four-layer PINN model with reference data integration and advanced training/visualization.
+- `Forward Model/FL_CC_Forward_Model.py`: Demonstrates PINN modeling for two layers (Fluid Layer and Cell Cluster) with interface continuity.
+
+### Typical Workflow
+
+1. **Edit parameters and reference data** at the top of the script as needed.
+2. **Run the script** (e.g., `python Forward Model/All_layers_Forward_Model.py`).
+3. **Inspect output plots** in `Forward Model/plots/` for predicted oxygen profiles and error analysis.
+
+This PINN-based forward model enables flexible, data-driven simulation of retinal oxygen transport, and serves as a foundation for comparison with classical numerical solvers.
 
 ---
 
@@ -279,18 +307,18 @@ The forward PINN will implement:
 ## COMSOL Validation
 
 
-To ensure our numerical and PINN approaches faithfully reproduce the underlying physics—and to guard against subtle mis‑interpretations of the reference paper—we implemented an independent model in **COMSOL Multiphysics®**. This served as a “sanity check” for boundary conditions, layer‑specific parameters, and the transition between time‑dependent and steady‑state behavior.
+To ensure our numerical and PINN approaches faithfully reproduce the underlying physics—and to guard against subtle mis‑interpretations of the reference paper—we implemented an independent model in **COMSOL Multiphysics®**. This served as a "sanity check" for boundary conditions, layer‑specific parameters, and the transition between time‑dependent and steady‑state behavior.
 
 ### 1. Validation Motivation
 
 * **Human fallibility**: Even well‑documented reference studies can be misread or mis‑transcribed.
 * **PDE behavior**: Our hypothesis (and literature reports) indicate that the retinal diffusion–reaction PDE behaves as transient within a finite time window, but rapidly approaches steady state thereafter.
-* **Cross‑platform confidence**: By reproducing the problem in a commercial finite‑element environment, we gain high assurance in both our parametrization and our own solvers’ implementation.
+* **Cross‑platform confidence**: By reproducing the problem in a commercial finite‑element environment, we gain high assurance in both our parametrization and our own solvers' implementation.
 
 ### 2. COMSOL Model Setup
 
 * **Geometry & Layers**: Four contiguous 1D domains matching our Python/DeepXDE definitions (photoreceptor side → vitreous side).
-* **Material Properties**: Diffusivities $D_i$ and reaction rates $k_i$ imported directly from our code’s parameter file.
+* **Material Properties**: Diffusivities $D_i$ and reaction rates $k_i$ imported directly from our code's parameter file.
 * **Boundary & Initial Conditions**:
 
   * $C(z,0)$ set to baseline profile.
@@ -320,7 +348,7 @@ After training, the script automatically:
 
    * **Parity Plots**: True vs. predicted parameters, ±10 % bands
    * **Profile Reconstructions**: Best, worst, and random sample overlays
-   * **Error Analysis**: Run‐wise error evolution, boxplots, correlation heatmaps
+   * **Error Analysis**: Run‑wise error evolution, boxplots, correlation heatmaps
 2. **Saves Model Checkpoints** (`masterpiece_checkpoints/`)
 3. **Writes Summary** (`masterpiece_summary.json`) with best-run metrics
 
@@ -349,20 +377,20 @@ Use these to compare classical vs. PINN performance in terms of:
 ## References
 
 
-1. W. E. Schiesser, *Differential Equation Analysis in Biomedical Science and Engineering: Case Studies with MATLAB*, Cambridge University Press, 2013, ch. 4, “Retinal O₂ transport.”
-2. D. Y. Yu and S. J. Cringle, “Oxygen distribution and consumption in the retina: Modeling and measurement,” *Bioengineering Department*, University of Illinois at Urbana–Champaign, Tech. Rep., 2002.
-3. M. Raissi, P. Perdikaris, and G. E. Karniadakis, “Physics‐Informed Neural Networks: A Deep Learning Framework for Solving Forward and Inverse Problems Involving Nonlinear Partial Differential Equations,” *Journal of Computational Physics*, vol. 378, pp. 686–707, Feb. 2019.
-4. L. Lu, P. Jin, and G. E. Karniadakis, “DeepXDE: A Deep Learning Library for Solving Differential Equations,” *SIAM Review*, vol. 63, no. 1, pp. 208–228, 2021.
-5. SciANN, “SciANN: A Keras‐based, high‐level API for physics‐informed neural networks,” 2024. \[Online]. Available: [https://www.sciann.com](https://www.sciann.com)
-6. A. Toledo‐Marín *et al.*, “Convolutional Surrogate Modeling of Multiphase Flow in Porous Media,” in *Proc. NeurIPS ML for Physical Sciences Workshop*, 2021.
-7. J. Seman, “Adaptive Physics‐Informed Neural Networks for Reaction‐Diffusion Systems,” *Frontiers in Physics*, vol. 8, p. 632, 2020.
-8. H. Y. Zhu *et al.*, “PINN for Piecewise Coefficient PDEs,” *ETNA*. vol. 56, pp. 1–27, 2022.
-9. J. D. Liu *et al.*, “3D Image‐based Arterial Network Modeling of Retinal Oxygen Tension,” *IEEE Trans. Biomedical Engineering*, vol. 56, no. 9, pp. 2345–2354, Sep. 2009.
-10. E. Aquah *et al.*, “CFD Modeling of Retinal Ischemia and Hemoglobin Affinity Effects,” *Computers in Biology and Medicine*, vol. 131, p. 104234, 2021.
-11. E. J. McHugh *et al.*, “3D Finite‐Element Diffusion Modeling of Hypoxia in AMD from OCT Scans,” *PLOS One*, vol. 14, no. 6, e0216215, 2019.
-12. S. A. Spencer *et al.*, “In Vivo Measurement of Retinal Oxygen Tension Gradients,” *Invest. Ophthalmol. Vis. Sci.*, vol. 54, no. 6, pp. 4060–4067, Jun. 2013.
-13. A. Xiaowei *et al.*, “Integrating Physics‐Based Modeling with Machine Learning: A Survey,” 2020. \[Online]. Available: [https://beiyulincs.github.io/teach/fall\_2020/papers/xiaowei.pdf](https://beiyulincs.github.io/teach/fall_2020/papers/xiaowei.pdf)
-14. “Mass diffusivity,” *Wikipedia*, 2024. \[Online]. Available: [https://en.wikipedia.org/wiki/Mass\_diffusivity](https://en.wikipedia.org/wiki/Mass_diffusivity)
-15. “Physics‐Based Deep Learning,” 2024. \[Online]. Available: [https://physicsbaseddeeplearning.org/intro.html](https://physicsbaseddeeplearning.org/intro.html)
+1. W. E. Schiesser, *Differential Equation Analysis in Biomedical Science and Engineering: Case Studies with MATLAB*, Cambridge University Press, 2013, ch. "Retinal O₂ transport."
+2. D. Y. Yu and S. J. Cringle, "Oxygen distribution and consumption in the retina: Modeling and measurement," *Bioengineering Department*, University of Illinois at Urbana–Champaign, Tech. Rep., 2002.
+3. M. Raissi, P. Perdikaris, and G. E. Karniadakis, "Physics‐Informed Neural Networks: A Deep Learning Framework for Solving Forward and Inverse Problems Involving Nonlinear Partial Differential Equations," *Journal of Computational Physics*, vol. 378, pp. 686–707, Feb. 2019.
+4. L. Lu, P. Jin, and G. E. Karniadakis, "DeepXDE: A Deep Learning Library for Solving Differential Equations," *SIAM Review*, vol. 63, no. 1, pp. 208–228, 2021.
+5. SciANN, "SciANN: A Keras‑based, high‑level API for physics‐informed neural networks," 2024. [Online]. Available: [https://www.sciann.com](https://www.sciann.com)
+6. A. Toledo‑Marín *et al.*, "Convolutional Surrogate Modeling of Multiphase Flow in Porous Media," in *Proc. NeurIPS ML for Physical Sciences Workshop*, 2021.
+7. J. Seman, "Adaptive Physics‐Informed Neural Networks for Reaction‐Diffusion Systems," *Frontiers in Physics*, vol. 8, p. 632, 2020.
+8. H. Y. Zhu *et al.*, "PINN for Piecewise Coefficient PDEs," *ETNA*. vol. 56, pp. 1–27, 2022.
+9. J. D. Liu *et al.*, "3D Image‐based Arterial Network Modeling of Retinal Oxygen Tension," *IEEE Trans. Biomedical Engineering*, vol. 56, no. 9, pp. 2345–2354, Sep. 2009.
+10. E. Aquah *et al.*, "CFD Modeling of Retinal Ischemia and Hemoglobin Affinity Effects," *Computers in Biology and Medicine*, vol. 131, p. 104234, 2021.
+11. E. J. McHugh *et al.*, "3D Finite‐Element Diffusion Modeling of Hypoxia in AMD from OCT Scans," *PLOS One*, vol. 14, no. 6, e0216215, 2019.
+12. S. A. Spencer *et al.*, "In Vivo Measurement of Retinal Oxygen Tension Gradients," *Invest. Ophthalmol. Vis. Sci.*, vol. 54, no. 6, pp. 4060–4067, Jun. 2013.
+13. A. Xiaowei *et al.*, "Integrating Physics‐Based Modeling with Machine Learning: A Survey," 2020. [Online]. Available: [https://beiyulincs.github.io/teach/fall\_2020/papers/xiaowei.pdf](https://beiyulincs.github.io/teach/fall_2020/papers/xiaowei.pdf)
+14. "Mass diffusivity," *Wikipedia*, 2024. [Online]. Available: [https://en.wikipedia.org/wiki/Mass\_diffusivity](https://en.wikipedia.org/wiki/Mass_diffusivity)
+15. "Physics‐Based Deep Learning," 2024. [Online]. Available: [https://physicsbaseddeeplearning.org/intro.html](https://physicsbaseddeeplearning.org/intro.html)
 
 

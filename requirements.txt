@@ -1,35 +1,48 @@
 # Core Scientific Stack
 numpy>=1.21.0
 scipy>=1.7.0
+pandas>=2.0.0
 matplotlib>=3.5.0
 
-# Deep Learning
+# Deep Learning & Neural Networks
+tensorflow>=2.13.0
+tensorflow-probability>=0.21.0
+keras>=2.13.0
 torch>=2.0.0
 pytorch-lightning>=2.0.0
+deepxde>=1.0.0
+tensorboard>=2.13.0
+
+# GPU Support (optional)
+nvidia-cudnn-cu11>=8.9.2  # Only if using NVIDIA GPU
+tensorflow-metal>=1.0.0   # Only for MacOS with M1/M2 chips
 
 # Numerical Computing & Optimization
 numba>=0.56.0
 scikit-learn>=1.0.0
+sympy>=1.12.0
 
 # Progress Bars & Utilities
 tqdm>=4.65.0
 pyyaml>=6.0.0
-
-# Optional: DeepXDE (for future forward PINN)
-# deepxde>=1.0.0
+rich>=13.0.0
 
 # Testing & Development
 pytest>=7.0.0
 pytest-cov>=4.0.0
 black>=22.0.0
 flake8>=4.0.0
+isort>=5.12.0
 
-# Version Control
+# Version Control & Project Management
 GitPython>=3.1.0
+pre-commit>=3.3.0
 
-# Notebook Support (Optional)
+# Notebook Support
 jupyter>=1.0.0
 ipython>=8.0.0
+jupyterlab>=4.0.0
 
-# Plotting Enhancements
+# Visualization
 seaborn>=0.12.0
+plotly>=5.15.0
