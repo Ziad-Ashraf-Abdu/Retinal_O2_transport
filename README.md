@@ -205,6 +205,8 @@ Modify these to suit your computational budget and desired accuracy.
 
 ## Forward Model (PINN-based)
 
+> Here is a working for the 4 Layers code [Kaggle Notebook]{https://www.kaggle.com/code/saifmo/retinal-o2-transport/edit}
+
 The **Forward Model** implements a Physics-Informed Neural Network (PINN) approach to directly solve the oxygen transport PDE across the retina's four layers, using the [DeepXDE](https://github.com/lululxvi/deepxde) library. This approach provides a mesh-free, differentiable solver that can flexibly incorporate experimental or reference data, complex boundary/interface conditions, and spatially varying parameters.
 
 ### Key Features
@@ -216,21 +218,24 @@ The **Forward Model** implements a Physics-Informed Neural Network (PINN) approa
   - Dirichlet boundary conditions at the retina's boundaries, set using reference data or physiological values.
   - Enforces continuity of concentration and flux at all layer interfaces.
 - **Reference Data Integration:**
-  - Incorporates experimental or literature-based oxygen profiles as additional constraints (via `PointSetBC`), improving physical realism and data consistency.
+  - Incorporates experimental or literature-based oxygen profiles as additional constraints, improving physical realism and data consistency.
 - **Neural Network Architecture:**
-  - Deep, fully connected feedforward network (default: 8 layers, 256 neurons each, tanh activation).
-  - Trained with adaptive loss weighting to balance PDE, boundary, and data constraints.
+  - Deep, fully connected feedforward network (default: 6 layers, 256 neurons each, tanh activation).
+  - Trained with adaptive loss weighting to balance PDE, and boundary constraints.
 - **Training Workflow:**
   - Multi-phase training: initial emphasis on data fit, followed by balanced and high-precision phases, and final L-BFGS optimization.
   - Uses both Adam and L-BFGS optimizers for robust convergence.
 - **Validation & Visualization:**
-  - Evaluates model predictions against reference data for each layer (MAE, RMSE, MAPE).
+  - Evaluates model predictions against reference data for each layer (MSE, Relative Error).
   - Generates comprehensive plots: predicted vs. reference profiles, error curves, and per-layer performance metrics.
   - Example output figures are saved in `Forward Model/plots/`.
 
 ### Example Scripts
 
 - `Forward Model/All_layers_Forward_Model.py`: Full four-layer PINN model with reference data integration and advanced training/visualization.
+
+### Result matrices for each layer
+[image.png]
 
 ### Typical Workflow
 
