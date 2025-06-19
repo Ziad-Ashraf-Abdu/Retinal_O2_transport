@@ -72,7 +72,8 @@ RETINA/
 │   └── O2_profile.py             # PINN for inverse oxygen profile modeling
 │
 ├── Forward Model/ 
-│   └── ...                       
+│   ├── pltos/
+    ├── All_layers_Forward_Model.py
 
 ├── .gitignore                    # Git ignored files
 ├── README.md                     # Project overview and instructions
@@ -140,15 +141,6 @@ This:
 * Generates synthetic profiles via the four‑layer analytical forward solver
 * Trains the `Lightning` module through pretraining and physics‑fine‑tuning
 * Saves parity plots, reconstructions, and summary metrics
-
-### 3. Forward PINN (Future)
-
-```bash
-python FowrwardModel.py
-```
-
-
-
 ---
 
 ## Configuration
@@ -239,7 +231,6 @@ The **Forward Model** implements a Physics-Informed Neural Network (PINN) approa
 ### Example Scripts
 
 - `Forward Model/All_layers_Forward_Model.py`: Full four-layer PINN model with reference data integration and advanced training/visualization.
-- `Forward Model/FL_CC_Forward_Model.py`: Demonstrates PINN modeling for two layers (Fluid Layer and Cell Cluster) with interface continuity.
 
 ### Typical Workflow
 
