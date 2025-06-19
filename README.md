@@ -117,10 +117,10 @@ RETINA/
 ### 1. Numerical Solvers Only
 
 ```bash
-python O2_profile.py --method fdm --mode steady
-python O2_profile.py --method fdm --mode transient
-python O2_profile.py --method fvm --mode steady
-python O2_profile.py --method fvm --mode transient
+python Steady state.py #FDM
+python Time dependent.py #FDM
+python steady state_FVM.py #FVM
+python time dependent_LASTVERSION.py #FVM
 ```
 
 These commands will:
@@ -132,19 +132,19 @@ These commands will:
 ### 2. Inverse PINN Training
 
 ```bash
-python O2_profile.py --train inverse
+python O2_profile.py
 ```
 
 This:
 
 * Generates synthetic profiles via the four‑layer analytical forward solver
-* Trains the `MasterpieceLightning` module through pretraining and physics‑fine‑tuning
+* Trains the `Lightning` module through pretraining and physics‑fine‑tuning
 * Saves parity plots, reconstructions, and summary metrics
 
 ### 3. Forward PINN (Future)
 
 ```bash
-python O2_profile.py --train forward_pinn
+python FowrwardModel.py
 ```
 
 
