@@ -203,9 +203,9 @@ Modify these to suit your computational budget and desired accuracy.
 
 ---
 
-## Forward Model (PINN-based)
+## Forward PINN Model 
 
-> Here is a working for the 4 Layers code [Kaggle Notebook](https://www.kaggle.com/code/saifmo/retinal-o2-transport/edit) and a [Colab Notebook](https://colab.research.google.com/drive/1bAXA8vFtfz-1vo3hFOHv3sqa66WQnPH3?usp=sharing) for the IR model with fixed parameters
+> Here is a working [Kaggle Notebook](https://www.kaggle.com/code/saifmo/retinal-o2-transport/edit) for the 4 Layers code and a [Colab Notebook](https://colab.research.google.com/drive/1bAXA8vFtfz-1vo3hFOHv3sqa66WQnPH3?usp=sharing) for the IR model with fixed parameters
 
 The **Forward Model** implements a Physics-Informed Neural Network (PINN) approach to directly solve the oxygen transport PDE across the retina's four layers, using the [DeepXDE](https://github.com/lululxvi/deepxde) library. This approach provides a mesh-free, differentiable solver that can flexibly incorporate experimental or reference data, complex boundary/interface conditions, and spatially varying parameters.
 
@@ -221,12 +221,12 @@ The **Forward Model** implements a Physics-Informed Neural Network (PINN) approa
   - Incorporates experimental or literature-based oxygen profiles as additional constraints, improving physical realism and data consistency.
 - **Neural Network Architecture:**
   - Deep, fully connected feedforward network (default: 6 layers, 256 neurons each, tanh activation).
-  - Trained with adaptive loss weighting to balance PDE, and boundary constraints.
+  - Trained with adaptive loss weighting to balance PDE and boundary constraints.
 - **Training Workflow:**
   - Multi-phase training: initial emphasis on data fit, followed by balanced and high-precision phases, and final L-BFGS optimization.
   - Uses both Adam and L-BFGS optimizers for robust convergence.
 - **Validation & Visualization:**
-  - Evaluates model predictions against reference data for each layer (MSE, Relative Error).
+  - Evaluate model predictions against each layer's reference data (MSE, Relative Error).
   - Generates comprehensive plots: predicted vs. reference profiles, error curves, and per-layer performance metrics.
   - Example output figures are saved in `Forward Model/plots/`.
 
