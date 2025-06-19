@@ -17,7 +17,7 @@
 
      * Steady‑State Solver
      * Time‑Dependent Solver (Backward Euler)
-8. [Forward PINN Model (Coming Soon)](#forward-pinn-model-coming-soon)
+8. [Forward PINN Model](#forward-pinn-model)
 9. [Inverse PINN Model](#inverse-pinn-model)
 
    * Data Generation (`MasterpieceDataset`)
@@ -205,7 +205,7 @@ Modify these to suit your computational budget and desired accuracy.
 
 ## Forward Model (PINN-based)
 
-> Here is a working for the 4 Layers code [Kaggle Notebook]{https://www.kaggle.com/code/saifmo/retinal-o2-transport/edit}
+> Here is a working for the 4 Layers code [Kaggle Notebook](https://www.kaggle.com/code/saifmo/retinal-o2-transport/edit) and a [Colab Notebook](https://colab.research.google.com/drive/1bAXA8vFtfz-1vo3hFOHv3sqa66WQnPH3?usp=sharing) for the IR model with fixed parameters
 
 The **Forward Model** implements a Physics-Informed Neural Network (PINN) approach to directly solve the oxygen transport PDE across the retina's four layers, using the [DeepXDE](https://github.com/lululxvi/deepxde) library. This approach provides a mesh-free, differentiable solver that can flexibly incorporate experimental or reference data, complex boundary/interface conditions, and spatially varying parameters.
 
@@ -235,7 +235,28 @@ The **Forward Model** implements a Physics-Informed Neural Network (PINN) approa
 - `Forward Model/All_layers_Forward_Model.py`: Full four-layer PINN model with reference data integration and advanced training/visualization.
 
 ### Result matrices for each layer
-![image.png]
+
+```
+Inner Retina (IR):
+   ➔ MAE      = 0.0768
+   ➔ RMSE     = 0.0868
+   ➔ Rel L2   = 0.0033
+
+Outer Retina (OR):
+   ➔ MAE      = 0.9996
+   ➔ RMSE     = 1.1536
+   ➔ Rel L2   = 0.0344
+
+Photoreceptor Layer (FL):
+   ➔ MAE      = 1.1399
+   ➔ RMSE     = 1.4363
+   ➔ Rel L2   = 0.0261
+
+Choroidal Capillary (CC):
+   ➔ MAE      = 3.4306
+   ➔ RMSE     = 3.7262
+   ➔ Rel L2   = 0.0375
+```
 
 ### Typical Workflow
 
