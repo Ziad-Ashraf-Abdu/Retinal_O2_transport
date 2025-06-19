@@ -8,7 +8,10 @@
 5. [Usage](#usage)
 6. [Configuration](#configuration)
 7. [Numerical Solution Methods](#numerical-solution-methods)
+  * Method of Lines (MOL)
 
+     * Steady‑State Solution (via long-time integration)
+     * Time‑Dependent Solver (BDF Solver)
    * Finite‑Difference Method (FDM)
 
      * Steady‑State Solver
@@ -36,10 +39,11 @@
 
 This repository implements and compares four distinct computational schemes for modeling oxygen transport in the retina's layered structure:
 
-1. **Finite‑Difference Method (FDM)** – both steady‑state and explicit time‑dependent solvers.
-2. **Finite‑Volume Method (FVM)** – both steady‑state and implicit time‑dependent solvers.
-3. **Forward Physics‑Informed Neural Network (Forward PINN)** – a mesh‑free, PDE‑embedded neural solver (to be released imminently).
-4. **Inverse PINN** – learns layer parameters $(D_i, k_i)$ and boundary concentrations $(C_0, C_L)$ directly from simulated or measured oxygen profiles.
+1.**Method of Lines (MOL)** – time‑dependent solver (BDF), with steady‑state obtained via long‑time integration.
+2. **Finite‑Difference Method (FDM)** – both steady‑state and explicit time‑dependent solvers.
+3. **Finite‑Volume Method (FVM)** – both steady‑state and implicit time‑dependent solvers.
+4. **Forward Physics‑Informed Neural Network (Forward PINN)** – a mesh‑free, PDE‑embedded neural solver (to be released imminently).
+5. **Inverse PINN** – learns layer parameters $(D_i, k_i)$ and boundary concentrations $(C_0, C_L)$ directly from simulated or measured oxygen profiles.
 
 The main goal is to quantify and contrast **accuracy**, **computational cost**, and **data requirements** of classical numerical schemes versus physics‑informed machine learning approaches in a four‑layer retinal setting.
 
