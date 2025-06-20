@@ -8,7 +8,10 @@
 5. [Usage](#usage)
 6. [Configuration](#configuration)
 7. [Numerical Solution Methods](#numerical-solution-methods)
+  * Method of Lines (MOL)
 
+     * Steady‑State Solution (via long-time integration)
+     * Time‑Dependent Solver (BDF Solver)
    * Finite‑Difference Method (FDM)
 
      * Steady‑State Solver
@@ -32,13 +35,15 @@
 ---
 
 ## Project Overview
+> Our project page https://ziad-ashraf-abdu.github.io/Retinal_O2_transport/
 
 This repository implements and compares four distinct computational schemes for modeling oxygen transport in the retina's layered structure:
 
-1. **Finite‑Difference Method (FDM)** – both steady‑state and explicit time‑dependent solvers.
-2. **Finite‑Volume Method (FVM)** – both steady‑state and implicit time‑dependent solvers.
-3. **Forward Physics‑Informed Neural Network (Forward PINN)** – a mesh‑free, PDE‑embedded neural solver (to be released imminently).
-4. **Inverse PINN** – learns layer parameters $(D_i, k_i)$ and boundary concentrations $(C_0, C_L)$ directly from simulated or measured oxygen profiles.
+1.**Method of Lines (MOL)** – time‑dependent solver (BDF), with steady‑state obtained via long‑time integration.
+2. **Finite‑Difference Method (FDM)** – both steady‑state and explicit time‑dependent solvers.
+3. **Finite‑Volume Method (FVM)** – both steady‑state and implicit time‑dependent solvers.
+4. **Forward Physics‑Informed Neural Network (Forward PINN)** – a mesh‑free, PDE‑embedded neural solver (to be released imminently).
+5. **Inverse PINN** – learns layer parameters $(D_i, k_i)$ and boundary concentrations $(C_0, C_L)$ directly from simulated or measured oxygen profiles.
 
 The main goal is to quantify and contrast **accuracy**, **computational cost**, and **data requirements** of classical numerical schemes versus physics‑informed machine learning approaches in a four‑layer retinal setting.
 
@@ -172,6 +177,24 @@ Modify these to suit your computational budget and desired accuracy.
 ---
 
 ## Numerical Solution Methods
+
+### Method of Lines (MOL)
+
+#### Steady‑State Solver
+
+* Discretizes ∂²u/∂z² using central finite differences on a uniform grid.
+* Forms an ODE system:  
+  du_i/dt = D_i * ( u_{i+1} - 2u_i + u_{i-1} ) / (Δz)²  - k_i * u_i
+* Enforces flux continuity at interfaces:  
+  u_interface(+) = u_interface(-)
+* Applies Dirichlet boundary conditions:  
+  u(0, t) = 20 mmHg, u(L, t) = 100 mmHg
+
+#### Time‑Dependent Solver (Backward Differentiation Formula — BDF)
+
+* Time integration using implicit BDF for stiff systems.
+* Solves ODE system with solve_ivp(method='BDF'), t ∈ [0, 30 s].
+* Stable for large time steps — accurate for reaction-diffusion in layered retina.
 
 ### Finite‑Difference Method (FDM)
 
