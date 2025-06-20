@@ -465,7 +465,7 @@ strong {
 /* Enhanced Dive Into Details Section */
 .dive-section {
     max-width: 1200px;
-    margin: 3rem auto;
+    margin: 3rem 0;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(20px);
     border-radius: 20px;
@@ -486,7 +486,7 @@ strong {
     background-clip: text;
     animation: gradientShift 3s ease-in-out infinite;
     margin-bottom: 1rem;
-    text-align: center;
+    text-align: left;
 }
 
 @keyframes gradientShift {
@@ -499,7 +499,7 @@ strong {
     color: var(--text-secondary);
     font-weight: 300;
     line-height: 1.6;
-    text-align: center;
+    text-align: left;
     margin-bottom: 3rem;
 }
 
