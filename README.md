@@ -245,16 +245,16 @@ The model integrates both the underlying physics of diffusion and real experimen
 #### 2. Governing Equation
 The mathematical foundation of the model is a second-order partial differential equation (PDE) representing diffusion and consumption:
 
-\[
+$$
 D(z) \cdot \frac{d^2u}{dz^2} - k(z) \cdot u = 0
-\]
+$$
 
 Where:
-- \(u(z)\): Oxygen partial pressure at depth \(z\)
-- \(D(z)\): Diffusion coefficient (layer-specific)
-- \(k(z)\): Consumption rate (layer-specific)
+- $u(z)$: Oxygen partial pressure at depth $z$
+- $D(z)$: Diffusion coefficient (layer-specific)
+- $k(z)$: Consumption rate (layer-specific)
 
-The equation form remains the same across all layers, but the parameters \(D\) and \(k\) change depending on the layer properties.
+The equation form remains the same across all layers, but the parameters $D$ and $k$ change depending on the layer properties.
 
 #### 3. Domain Partitioning Using Logical Masks
 To correctly apply layer-specific physics within a single PDE framework, logical masks are used. Each spatial region corresponding to a layer is identified by a boolean mask. For example, the mask for the Inner Retina (IR) is defined as:
@@ -265,9 +265,9 @@ mask_IR = tf.cast((z >= zL) & (z <= zIR), tf.float32)
 
 The PDE residual is constructed as a sum over the contributions of all layers, weighted by their respective masks:
 
-\[
+$$
 \text{PDE Residual} = \sum_{i=1}^{4} \text{mask}_i \cdot \left( D_i \cdot u_{zz} - k_i \cdot u \right)
-\]
+$$
 
 This ensures that each point in the domain follows the correct physical behavior according to its assigned layer.
 
@@ -284,27 +284,27 @@ The computational model employs a fully connected feedforward neural network (FN
 - **Activation Function:** tanh
 - **Initialization:** Glorot normal initializer
 
-The network predicts the scalar field \(u(z)\), representing the oxygen partial pressure, across the entire retinal depth.
+The network predicts the scalar field $u(z)$, representing the oxygen partial pressure, across the entire retinal depth.
 
 #### 6. Loss Function Definition and Training Process
 ##### 6.1. Loss Components
 The total loss minimized during training is a weighted combination of four terms:
 
-\[
+$$
 \mathcal{L}_{\text{total}} = w_{\text{PDE}} \cdot \mathcal{L}_{\text{PDE}} + w_{\text{BC1}} \cdot \mathcal{L}_{\text{BC1}} + w_{\text{BC2}} \cdot \mathcal{L}_{\text{BC2}} + w_{\text{Data}} \cdot \mathcal{L}_{\text{Data}}
-\]
+$$
 
 | Component | Description |
 |-----------|-------------|
-| \(\mathcal{L}_{\text{PDE}}\) | Residual loss of the PDE (physics consistency) |
-| \(\mathcal{L}_{\text{BC1}}\) | Loss at left boundary (z = 0) |
-| \(\mathcal{L}_{\text{BC2}}\) | Loss at right boundary (z = 250) |
-| \(\mathcal{L}_{\text{Data}}\) | MSE between model predictions and reference data |
+| $\mathcal{L}_{\text{PDE}}$ | Residual loss of the PDE (physics consistency) |
+| $\mathcal{L}_{\text{BC1}}$ | Loss at left boundary (z = 0) |
+| $\mathcal{L}_{\text{BC2}}$ | Loss at right boundary (z = 250) |
+| $\mathcal{L}_{\text{Data}}$ | MSE between model predictions and reference data |
 
 ##### 6.2. How the Loss is Computed
-- **PDE Residual Loss (\(\mathcal{L}_{\text{PDE}}\))**: Calculated as the mean squared difference between the left-hand and right-hand sides of the PDE at collocation points.
-- **Boundary Losses (\(\mathcal{L}_{\text{BC1}}, \mathcal{L}_{\text{BC2}}\))**: Squared error between predicted and true boundary oxygen pressures.
-- **Reference Data Loss (\(\mathcal{L}_{\text{Data}}\))**: Squared error between the model predictions and real empirical measurements.
+- **PDE Residual Loss ($\mathcal{L}_{\text{PDE}}$):** Calculated as the mean squared difference between the left-hand and right-hand sides of the PDE at collocation points.
+- **Boundary Losses ($\mathcal{L}_{\text{BC1}}, \mathcal{L}_{\text{BC2}}$):** Squared error between predicted and true boundary oxygen pressures.
+- **Reference Data Loss ($\mathcal{L}_{\text{Data}}$):** Squared error between the model predictions and real empirical measurements.
 
 ##### 6.3. Loss Weights Across Training Phases
 Training is structured into four adaptive phases with different emphasis on each loss component:
@@ -328,13 +328,13 @@ Model performance is assessed using three primary error metrics:
 
 #### 8. Results
 
-| Layer | MAE (mmHg) | RMSE (mmHg) | Rel L2 |
-|-------|------------|-------------|--------|
-| IR    | 0.0768     | 0.0868      | 0.0033 |
-| OR    | 0.9996     | 1.1536      | 0.0344 |
-| FL    | 1.1399     | 1.4363      | 0.0261 |
-| CC    | 3.4306     | 3.7262      | 0.0375 |
-| **Total Relative Error** |  |  | **≈ 2.53%** |
+| Layer                  | MAE (mmHg) | RMSE (mmHg) | Rel L2   |
+|------------------------|------------|-------------|----------|
+| Inner Retina (IR)      | 0.0724     | 0.0941      | 0.0036   |
+| Outer Retina (OR)      | 0.8980     | 1.0554      | 0.0315   |
+| Photoreceptor Layer (FL)| 1.1227    | 1.4182      | 0.0258   |
+| Choroidal Capillary (CC)| 3.3135    | 3.5869      | 0.0361   |
+| **Total Relative Error (average)** |        |             | **2.11%** |
 
 **Interpretation:**
 - The Inner Retina (IR) showed the highest accuracy due to its stable profile.
