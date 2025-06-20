@@ -123,7 +123,7 @@
                 <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/Each%20Layer%20Steady%20State.png" alt="Steady State FDM" style="width: 700px; max-width: 100%;">
             </p>
             <p style="text-align: center;">
-                <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/Time Dependent Graph.png" alt="Time Dependent FDM" style="width: 700px; max-width: 100%;">
+                <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Analytical%20Solution/plots/Time%20Dependent%20Graph.png" alt="Time Dependent FDM" style="width: 700px; max-width: 100%;">
             </p>
         </div>
 
@@ -132,12 +132,16 @@
         <div class="content-card">
             <h3>PINN Reconstruction of Oxygen Profile</h3>
             <p>A neural collocation approach where a network is trained to satisfy the governing PDE and boundary conditions throughout the domain, producing a continuous function approximation of C(z,t). This model offers a purely data-driven solver for both transient and steady-state problems—no grid required. Once integrated, it will be directly compared to our FDM/FVM benchmarks for speed, accuracy, and mesh-independence.</p>
+            <p> This neural network consists of 6 layers with 256 neurons each, and a tanh activation function. It is trained with an adaptive loss weighting to balance the PDE, boundary, and data constraints. The training loss is calculated as the sum of the PDE, boundary, and data losses. The PDE loss is calculated as the mean squared error of the PDE residual, the boundary loss is calculated as the mean squared error of the boundary conditions, and the data loss is calculated as the mean squared error of the data. The training loss is then used to update the weights of the network. The network is trained for 10000 iterations, and the best model is saved.</p>
 
             <p style="text-align: center;">
-                <img src="Inverse Model/plots/profile_reconstruction.png" alt="PINN Profile Reconstruction" style="width: 700px; max-width: 100%;">
+                <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Forward%20Model/plots/image.png" alt="All layers Forward Model output" style="width: 700px; max-width: 100%;">
             </p>
-            <p style="text-align: center; font-style: italic;">
-                <strong>Figure 4.</strong> Overlay of measured and PINN-predicted concentration profiles from only 10 spatial sensors per layer. L² error &lt; 0.5 %.
+            <p style="text-align: center;">
+                <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Forward%20Model/example/image.png" alt="Inter Retina with fixed parameters" style="width: 700px; max-width: 100%;">
+            </p>
+            <p style="text-align: center;">
+                <img src="https://raw.githubusercontent.com/Ziad-Ashraf-Abdu/Retinal_O2_transport/master/Forward%20Model/plots/evolution.png" alt="Evaluation of model predictions" style="width: 700px; max-width: 100%;">
             </p>
         </div>
 
