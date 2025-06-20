@@ -226,68 +226,140 @@ Modify these to suit your computational budget and desired accuracy.
 
 ---
 
-## Forward PINN Model 
+## Forward PINN Model
 
-> Here is a working [Kaggle Notebook](https://www.kaggle.com/code/saifmo/retinal-o2-transport/edit) for the 4 Layers code and a [Colab Notebook](https://colab.research.google.com/drive/1bAXA8vFtfz-1vo3hFOHv3sqa66WQnPH3?usp=sharing) for the IR model with fixed parameters
+### Physics-Informed Neural Network (PINN) for Modeling Oxygen Diffusion in the Retina
 
-The **Forward Model** implements a Physics-Informed Neural Network (PINN) approach to directly solve the oxygen transport PDE across the retina's four layers, using the [DeepXDE](https://github.com/lululxvi/deepxde) library. This approach provides a mesh-free, differentiable solver that can flexibly incorporate experimental or reference data, complex boundary/interface conditions, and spatially varying parameters.
+> Here is a working [Kaggle Notebook](https://www.kaggle.com/code/rahmafathyedress/retinal-o2-transport) for the 4 Layers code and a [Colab Notebook](https://colab.research.google.com/drive/1bAXA8vFtfz-1vo3hFOHv3sqa66WQnPH3?usp=sharing) 
+for the IR model with fixed parameters
 
-### Key Features
+#### 1. Objective
+The goal of this work is to model the steady-state oxygen diffusion across four anatomical layers of the retina, ensuring both physical and biological accuracy. The layers involved are:
+- **Inner Retina (IR)**
+- **Outer Retina (OR)**
+- **Photoreceptor Layer (FL)**
+- **Choroidal Capillary (CC)**
 
-- **Layered PDE Formulation:**
-  - Models oxygen diffusion and consumption in four contiguous retinal layers, each with distinct diffusivity ($D_i$) and consumption rate ($k_i$).
-  - The PDE is defined piecewise, with masks ensuring correct coefficients in each spatial region.
-- **Boundary & Interface Conditions:**
-  - Dirichlet boundary conditions at the retina's boundaries, set using reference data or physiological values.
-  - Enforces continuity of concentration and flux at all layer interfaces.
-- **Reference Data Integration:**
-  - Incorporates experimental or literature-based oxygen profiles as additional constraints, improving physical realism and data consistency.
-- **Neural Network Architecture:**
-  - Deep, fully connected feedforward network (default: 6 layers, 256 neurons each, tanh activation).
-  - Trained with adaptive loss weighting to balance PDE and boundary constraints.
-- **Training Workflow:**
-  - Multi-phase training: initial emphasis on data fit, followed by balanced and high-precision phases, and final L-BFGS optimization.
-  - Uses both Adam and L-BFGS optimizers for robust convergence.
-- **Validation & Visualization:**
-  - Evaluate model predictions against each layer's reference data (MSE, Relative Error).
-  - Generates comprehensive plots: predicted vs. reference profiles, error curves, and per-layer performance metrics.
-  - Example output figures are saved in `Forward Model/plots/`.
+The model integrates both the underlying physics of diffusion and real experimental measurements to capture the physiological behavior of oxygen transport within retinal tissues.
 
-### Example Scripts
+#### 2. Governing Equation
+The mathematical foundation of the model is a second-order partial differential equation (PDE) representing diffusion and consumption:
 
-- `Forward Model/All_layers_Forward_Model.py`: Full four-layer PINN model with reference data integration and advanced training/visualization.
+\[
+D(z) \cdot \frac{d^2u}{dz^2} - k(z) \cdot u = 0
+\]
 
-### Result matrices for each layer
+Where:
+- \(u(z)\): Oxygen partial pressure at depth \(z\)
+- \(D(z)\): Diffusion coefficient (layer-specific)
+- \(k(z)\): Consumption rate (layer-specific)
 
-```
-Inner Retina (IR):
-   ➔ MAE      = 0.0768
-   ➔ RMSE     = 0.0868
-   ➔ Rel L2   = 0.0033
+The equation form remains the same across all layers, but the parameters \(D\) and \(k\) change depending on the layer properties.
 
-Outer Retina (OR):
-   ➔ MAE      = 0.9996
-   ➔ RMSE     = 1.1536
-   ➔ Rel L2   = 0.0344
+#### 3. Domain Partitioning Using Logical Masks
+To correctly apply layer-specific physics within a single PDE framework, logical masks are used. Each spatial region corresponding to a layer is identified by a boolean mask. For example, the mask for the Inner Retina (IR) is defined as:
 
-Photoreceptor Layer (FL):
-   ➔ MAE      = 1.1399
-   ➔ RMSE     = 1.4363
-   ➔ Rel L2   = 0.0261
-
-Choroidal Capillary (CC):
-   ➔ MAE      = 3.4306
-   ➔ RMSE     = 3.7262
-   ➔ Rel L2   = 0.0375
+```python
+mask_IR = tf.cast((z >= zL) & (z <= zIR), tf.float32)
 ```
 
-### Typical Workflow
+The PDE residual is constructed as a sum over the contributions of all layers, weighted by their respective masks:
 
-1. **Edit parameters and reference data** at the top of the script as needed.
-2. **Run the script** (e.g., `python Forward Model/All_layers_Forward_Model.py`).
-3. **Inspect output plots** in `Forward Model/plots/` for predicted oxygen profiles and error analysis.
+\[
+\text{PDE Residual} = \sum_{i=1}^{4} \text{mask}_i \cdot \left( D_i \cdot u_{zz} - k_i \cdot u \right)
+\]
 
-This PINN-based forward model enables flexible, data-driven simulation of retinal oxygen transport, and serves as a foundation for comparison with classical numerical solvers.
+This ensures that each point in the domain follows the correct physical behavior according to its assigned layer.
+
+#### 4. Boundary Conditions and Reference Data
+Boundary conditions are defined at the two ends of the domain:
+- **Left boundary (z = 0):** Oxygen pressure set to the first measured value in the IR reference data.
+- **Right boundary (z = 250):** Oxygen pressure set to the last measured value in the CC reference data.
+
+In addition, 44 internal reference points from experimental measurements are incorporated as soft constraints using `PointSetBC` from DeepXDE, anchoring the neural network solution to biological reality.
+
+#### 5. Neural Network Architecture
+The computational model employs a fully connected feedforward neural network (FNN) with the following specifications:
+- **Architecture:** [1, 256, 256, 256, 256, 256, 256, 256, 256, 1]
+- **Activation Function:** tanh
+- **Initialization:** Glorot normal initializer
+
+The network predicts the scalar field \(u(z)\), representing the oxygen partial pressure, across the entire retinal depth.
+
+#### 6. Loss Function Definition and Training Process
+##### 6.1. Loss Components
+The total loss minimized during training is a weighted combination of four terms:
+
+\[
+\mathcal{L}_{\text{total}} = w_{\text{PDE}} \cdot \mathcal{L}_{\text{PDE}} + w_{\text{BC1}} \cdot \mathcal{L}_{\text{BC1}} + w_{\text{BC2}} \cdot \mathcal{L}_{\text{BC2}} + w_{\text{Data}} \cdot \mathcal{L}_{\text{Data}}
+\]
+
+| Component | Description |
+|-----------|-------------|
+| \(\mathcal{L}_{\text{PDE}}\) | Residual loss of the PDE (physics consistency) |
+| \(\mathcal{L}_{\text{BC1}}\) | Loss at left boundary (z = 0) |
+| \(\mathcal{L}_{\text{BC2}}\) | Loss at right boundary (z = 250) |
+| \(\mathcal{L}_{\text{Data}}\) | MSE between model predictions and reference data |
+
+##### 6.2. How the Loss is Computed
+- **PDE Residual Loss (\(\mathcal{L}_{\text{PDE}}\))**: Calculated as the mean squared difference between the left-hand and right-hand sides of the PDE at collocation points.
+- **Boundary Losses (\(\mathcal{L}_{\text{BC1}}, \mathcal{L}_{\text{BC2}}\))**: Squared error between predicted and true boundary oxygen pressures.
+- **Reference Data Loss (\(\mathcal{L}_{\text{Data}}\))**: Squared error between the model predictions and real empirical measurements.
+
+##### 6.3. Loss Weights Across Training Phases
+Training is structured into four adaptive phases with different emphasis on each loss component:
+
+| Phase | Purpose | Loss Weights: [PDE, BC1, BC2, Data] |
+|-------|---------|--------------------------------------|
+| 1 | Emphasize learning from data | [1.0, 10.0, 10.0, 50.0] |
+| 2 | Balance PDE with reference | [1.0, 5.0, 5.0, 20.0] |
+| 3 | Fine-tune data accuracy | [1.0, 10.0, 10.0, 30.0] |
+| 4 | Final convergence | [1.0, 5.0, 5.0, 25.0] + L-BFGS Optimizer |
+
+##### 6.4. Training Algorithm
+- Training utilizes the Adam optimizer for initial convergence, followed by the L-BFGS optimizer for high-precision minimization.
+- Automatic differentiation is used to compute the required derivatives for the PDE residual loss.
+
+#### 7. Evaluation Metrics
+Model performance is assessed using three primary error metrics:
+- **MAE (Mean Absolute Error)**
+- **RMSE (Root Mean Square Error)**
+- **Relative L2 Norm (Normalized Euclidean Error)**
+
+#### 8. Results
+
+| Layer | MAE (mmHg) | RMSE (mmHg) | Rel L2 |
+|-------|------------|-------------|--------|
+| IR    | 0.0768     | 0.0868      | 0.0033 |
+| OR    | 0.9996     | 1.1536      | 0.0344 |
+| FL    | 1.1399     | 1.4363      | 0.0261 |
+| CC    | 3.4306     | 3.7262      | 0.0375 |
+| **Total Relative Error** |  |  | **≈ 2.53%** |
+
+**Interpretation:**
+- The Inner Retina (IR) showed the highest accuracy due to its stable profile.
+- The Outer Retina (OR) and Photoreceptor Layer (FL) exhibited moderate errors due to more complex dynamics.
+- The Choroidal Capillary (CC) showed higher errors but maintained acceptable relative accuracy, especially considering the larger absolute oxygen values.
+
+#### 9. Conclusion
+The developed PINN successfully modeled oxygen diffusion in a multi-layered retinal structure using a single PDE structure with spatially dependent physical parameters. Logical masking enabled correct assignment of physics within each anatomical region, and real measurement data improved model fidelity.
+
+By employing a staged, adaptive training strategy with carefully selected loss weightings, the model achieved high accuracy across all layers of interest, supporting its potential for use in advanced retinal physiological simulations.
+
+#### 10. Computational Performance Analysis
+In addition to accuracy evaluation, the computational performance of the model was assessed. The average computational time per evaluation point for each anatomical layer was measured, providing insight into the model's efficiency during inference.
+
+| Layer | Avg Time (s) | Time/Point (ms) | Std Dev (s) |
+|-------|--------------|-----------------|-------------|
+| IR    | 0.000852     | 0.0085          | 0.000057    |
+| OR    | 0.000834     | 0.0083          | 0.000037    |
+| FL    | 0.000854     | 0.0085          | 0.000047    |
+| CC    | 0.000846     | 0.0085          | 0.000047    |
+| **Total** | **0.0034** |                 |             |
+
+**Interpretation:**
+- The model demonstrated consistent inference times across all layers, with average evaluation time per point ≈ 8.5 ms.
+- The small standard deviations confirm that predictions are stable in terms of computational cost regardless of the anatomical region.
 
 ---
 

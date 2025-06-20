@@ -13,6 +13,7 @@ pytorch-lightning>=2.0.0
 deepxde>=1.0.0
 tensorboard>=2.13.0
 
+
 # GPU Support (optional)
 nvidia-cudnn-cu11>=8.9.2  # Only if using NVIDIA GPU
 tensorflow-metal>=1.0.0   # Only for MacOS with M1/M2 chips

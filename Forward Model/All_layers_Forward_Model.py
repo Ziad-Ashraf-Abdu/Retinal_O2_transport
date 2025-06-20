@@ -193,31 +193,36 @@ print(f"Average RMSE: {overall_rmse:.4f}")
 z_test = np.linspace(zL_real, zCC_real, 1000).reshape(-1, 1)
 u_pred_full = model.predict(z_test)
 
-# Change subplot layout to 3x1 (ax1, ax2, ax3)
-fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 18))
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(18, 14))
 
 # Main comparison plot
 ax1.plot(z_test.flatten(), u_pred_full.flatten(), 'b-', linewidth=3, 
          label="Improved PINN Solution", alpha=0.9)
+
 # Plot reference data
 ax1.plot(z_meas_IR.flatten(), ref_IR, 'ro', markersize=8, label='Reference IR', alpha=0.8)
 ax1.plot(z_meas_OR.flatten(), ref_OR, 'go', markersize=8, label='Reference OR', alpha=0.8)
 ax1.plot(z_meas_FL.flatten(), ref_FL, 'bo', markersize=8, label='Reference FL', alpha=0.8)
 ax1.plot(z_meas_CC.flatten(), ref_CC, 'mo', markersize=8, label='Reference CC', alpha=0.8)
+
 # Plot predictions at measurement points
 ax1.plot(z_meas_IR.flatten(), u_pred_IR, 'rx', markersize=10, label='Prediction IR', alpha=0.8)
 ax1.plot(z_meas_OR.flatten(), u_pred_OR, 'gx', markersize=10, label='Prediction OR', alpha=0.8)
 ax1.plot(z_meas_FL.flatten(), u_pred_FL, 'bx', markersize=10, label='Prediction FL', alpha=0.8)
 ax1.plot(z_meas_CC.flatten(), u_pred_CC, 'mx', markersize=10, label='Prediction CC', alpha=0.8)
+
 # Add layer boundaries
 layer_colors = ['lightblue', 'lightcoral', 'lightgreen', 'plum']
 layer_names = ['Inner Retina', 'Outer Retina', 'Photoreceptor', 'Choroidal']
 boundaries = [zL_real, zIR_real, zOR_real, zFL_real, zCC_real]
+
 for i in range(len(boundaries)-1):
     ax1.axvspan(boundaries[i], boundaries[i+1], alpha=0.15, color=layer_colors[i])
+
 ax1.axvline(zIR_real, color='gray', linestyle='--', alpha=0.6)
 ax1.axvline(zOR_real, color='gray', linestyle='--', alpha=0.6)
 ax1.axvline(zFL_real, color='gray', linestyle='--', alpha=0.6)
+
 ax1.set_xlabel("Distance z (μm)", fontsize=12)
 ax1.set_ylabel("Oxygen Partial Pressure (mmHg)", fontsize=12)
 ax1.set_title("Improved PINN Model: Predictions vs Reference Data", fontsize=14)
@@ -229,6 +234,7 @@ errors_IR = np.abs(ref_IR - u_pred_IR)
 errors_OR = np.abs(ref_OR - u_pred_OR)
 errors_FL = np.abs(ref_FL - u_pred_FL)
 errors_CC = np.abs(ref_CC - u_pred_CC)
+
 ax2.plot(z_meas_IR.flatten(), errors_IR, 'ro-', label='IR Error', linewidth=2)
 ax2.plot(z_meas_OR.flatten(), errors_OR, 'go-', label='OR Error', linewidth=2)
 ax2.plot(z_meas_FL.flatten(), errors_FL, 'bo-', label='FL Error', linewidth=2)
@@ -242,32 +248,48 @@ ax2.set_title("Layer-wise Prediction Errors", fontsize=14)
 ax2.legend()
 ax2.grid(True, alpha=0.3)
 
-# Performance metrics comparison (now on ax3)
+# Training loss history
+if hasattr(losshistory, 'loss_train'):
+    ax3.semilogy(losshistory.steps, losshistory.loss_train, 'b-', linewidth=2, label="Training Loss")
+if hasattr(losshistory, 'loss_test') and losshistory.loss_test is not None:
+    ax3.semilogy(losshistory.steps, losshistory.loss_test, 'r--', linewidth=2, label="Test Loss")
+ax3.set_xlabel("Iteration", fontsize=12)
+ax3.set_ylabel("Loss", fontsize=12)
+ax3.set_title("Training History", fontsize=14)
+ax3.legend()
+ax3.grid(True, alpha=0.3)
+
+# Performance metrics comparison
 layers = ['IR', 'OR', 'FL', 'CC']
 mae_values = [mae_ir, mae_or, mae_fl, mae_cc]
 rmse_values = [rmse_ir, rmse_or, rmse_fl, rmse_cc]
+
 x = np.arange(len(layers))
 width = 0.35
-bars1 = ax3.bar(x - width/2, mae_values, width, label='MAE', alpha=0.8, color='skyblue')
-bars2 = ax3.bar(x + width/2, rmse_values, width, label='RMSE', alpha=0.8, color='lightcoral')
-ax3.set_xlabel('Layer', fontsize=12)
-ax3.set_ylabel('Error (mmHg)', fontsize=12)
-ax3.set_title('Performance Metrics by Layer', fontsize=14)
-ax3.set_xticks(x)
-ax3.set_xticklabels(layers)
-ax3.legend()
-ax3.grid(True, alpha=0.3)
+
+bars1 = ax4.bar(x - width/2, mae_values, width, label='MAE', alpha=0.8, color='skyblue')
+bars2 = ax4.bar(x + width/2, rmse_values, width, label='RMSE', alpha=0.8, color='lightcoral')
+
+ax4.set_xlabel('Layer', fontsize=12)
+ax4.set_ylabel('Error (mmHg)', fontsize=12)
+ax4.set_title('Performance Metrics by Layer', fontsize=14)
+ax4.set_xticks(x)
+ax4.set_xticklabels(layers)
+ax4.legend()
+ax4.grid(True, alpha=0.3)
+
 # Add value labels on bars
 for bar in bars1:
     height = bar.get_height()
-    ax3.annotate(f'{height:.2f}',
+    ax4.annotate(f'{height:.2f}',
                 xy=(bar.get_x() + bar.get_width() / 2, height),
                 xytext=(0, 3),
                 textcoords="offset points",
                 ha='center', va='bottom', fontsize=10)
+
 for bar in bars2:
     height = bar.get_height()
-    ax3.annotate(f'{height:.2f}',
+    ax4.annotate(f'{height:.2f}',
                 xy=(bar.get_x() + bar.get_width() / 2, height),
                 xytext=(0, 3),
                 textcoords="offset points",
