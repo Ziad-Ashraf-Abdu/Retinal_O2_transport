@@ -230,7 +230,7 @@ Modify these to suit your computational budget and desired accuracy.
 
 ### Physics-Informed Neural Network (PINN) for Modeling Oxygen Diffusion in the Retina
 
-> Here is a working [Kaggle Notebook](https://www.kaggle.com/code/rahmafathyedress/retinal-o2-transport) for the 4 Layers code and a [Colab Notebook](https://colab.research.google.com/drive/1bAXA8vFtfz-1vo3hFOHv3sqa66WQnPH3?usp=sharing) 
+> Here is a working [Kaggle Notebook](https://www.kaggle.com/code/rahmafathyedress/retinalo2-transport) for the 4 Layers code and a [Colab Notebook](https://colab.research.google.com/drive/1bAXA8vFtfz-1vo3hFOHv3sqa66WQnPH3?usp=sharing) 
 for the IR model with fixed parameters
 
 #### 1. Objective
