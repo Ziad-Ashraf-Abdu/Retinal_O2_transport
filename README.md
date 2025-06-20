@@ -485,7 +485,7 @@ You can view and download the full project report and LaTeX code below:
 
 * **Zeyad A. Abdu** – Lead inverse PINN design, assesting in COMSOL implemtation, repo management.
 * **Suhila T. Elmasry** – Numerical FVM implementation & validation, Documentation.
-* **Rahma F. Hamouda Edress** – Leading forward model design.
+* **Rahma F. Hamouda Edress** – Leading forward model design, Documentation.
 * **Haneen M. Gameel** – Numerical FVM implementation & validation, Documentation.
 * **Ahmed W. A. Naem** – Numerical FDM implementation & validation.
 * **Saif M. Ali** – Forward model design, repo management.
