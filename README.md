@@ -472,6 +472,14 @@ Use these to compare classical vs. PINN performance in terms of:
 * **Ease of Extension** (adding layers, unsteady terms)
 
 ---
+## Report & Overleaf
+
+You can view and download the full project report and LaTeX code below:
+
+- 📄 *Final Report (Google Drive):* [Project Report Folder](https://drive.google.com/drive/folders/14qoEp9Y48tujJ_jz_XZeNjQWd03Mk0lw)
+- 📘 *Overleaf LaTeX Source Code:* [Overleaf Project](https://www.overleaf.com/2454224742hjhsgtvyghmr)
+
+---
 
 ## Authors & Contributions
 
